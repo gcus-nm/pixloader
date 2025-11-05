@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixloader Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060f16;
+      --panel: rgba(18, 28, 46, 0.92);
+      --panel-hover: rgba(24, 38, 62, 0.98);
+      --border: rgba(255, 255, 255, 0.12);
+      --muted: rgba(224, 235, 255, 0.72);
+      --accent: #5b7dff;
+      --accent-strong: #8b5cff;
+      --badge-r18: rgba(255, 116, 156, 0.28);
+      --badge-ai: rgba(116, 255, 210, 0.24);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: #f3f7ff;
+    }
+    body[data-modal-open] { overflow: hidden; }
+    a { color: inherit; }
+    .viewer-shell {
+      display: grid;
+      grid-template-columns: minmax(260px, 320px) 1fr;
+      gap: 0;
+      min-height: 100vh;
+    }
+    .sidebar-panel {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+      padding: clamp(1.6rem, 4vw, 2.6rem) clamp(1.4rem, 5vw, 2.8rem);
+      background: rgba(6, 14, 28, 0.95);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(14px);
+      overflow-y: auto;
+    }
+    body[data-sidebar="hidden"] .sidebar-panel {
+      visibility: hidden;
+      pointer-events: none;
+      opacity: 0;
+    }
+    body[data-sidebar="hidden"] .viewer-shell {
+      grid-template-columns: 0 1fr;
+    }
+    .sidebar-restore {
+      position: fixed;
+      top: 1.2rem;
+      left: 1.2rem;
+      z-index: 30;
+      display: none;
+      padding: 0.5rem 1.4rem;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      box-shadow: 0 14px 28px rgba(6, 12, 24, 0.4);
+      font-weight: 600;
+    }
+    body[data-sidebar="hidden"] .sidebar-restore {
+      display: inline-flex;
+    }
+    .sidebar-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .sidebar-top h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+      font-weight: 700;
+    }
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    button,
+    .link-button {
+      border: none;
+      border-radius: 999px;
+      padding: 0.6rem 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: inherit;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    button.secondary,
+    .link-button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    button:hover,
+    .link-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 32px rgba(36, 58, 120, 0.32);
+    }
+    .status-row {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .status-chip {
+      padding: 0.55rem 1rem;
+      border-radius: 999px;
+      background: rgba(110, 150, 255, 0.18);
+      border: 1px solid rgba(110, 150, 255, 0.35);
+      font-size: 0.9rem;
+      color: rgba(210, 222, 255, 0.92);
+    }
+    form.filters {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      align-items: end;
+    }
+    form.filters label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    form.filters label.field-disabled {
+      opacity: 0.6;
+    }
+    form.filters label.field-disabled select {
+      cursor: not-allowed;
+    }
+    form.filters input,
+    form.filters select {
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(18, 30, 48, 0.92);
+      color: inherit;
+      font: inherit;
+    }
+    form.filters {
+      position: relative;
+      padding-bottom: 3.8rem;
+    }
+    .button-cell {
+      display: flex;
+      gap: 0.6rem;
+      position: sticky;
+      bottom: 0;
+      padding: 0.75rem 0;
+      margin-top: 0.8rem;
+      background: rgba(6, 14, 28, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 5;
+    }
+    .modal-backdrop,
+    .log-modal {
+      display: none;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 10, 24, 0.68);
+      backdrop-filter: blur(14px);
+      z-index: 80;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+    .log-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(1.6rem, 6vw, 3.2rem);
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.98);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .modal-backdrop.active {
+      display: block;
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .log-modal.active {
+      display: flex;
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+    .log-modal__dialog {
+      width: min(720px, 92vw);
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: clamp(1.4rem, 3vw, 2rem);
+      background: rgba(10, 18, 32, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.45);
+    }
+    .log-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .log-modal__title {
+      margin: 0;
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+    .log-modal__actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+        main {
+      padding: clamp(2.4rem, 6vw, 3.6rem) clamp(1.4rem, 6vw, 4.2rem) clamp(3rem, 7vw, 4.4rem);
+    }
+    .view-panel { display: none; }
+    body[data-display-mode="text"] .view-panel[data-panel="text"] { display: block; }
+    body[data-display-mode="text"] .view-panel[data-panel="grid"] { display: none; }
+    body:not([data-display-mode="text"]) .view-panel[data-panel="grid"] { display: grid; }
+    body:not([data-display-mode="text"]) .view-panel[data-panel="text"] { display: none; }
+    .list-wrapper {
+      overflow-x: auto;
+      background: rgba(12, 22, 38, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    table.list-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1000px;
+      color: rgba(224, 235, 255, 0.9);
+    }
+    table.list-table th,
+    table.list-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      vertical-align: top;
+    }
+    table.list-table th {
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: rgba(206, 220, 255, 0.75);
+    }
+    table.list-table tr.list-row:hover {
+      background: rgba(70, 100, 160, 0.18);
+    }
+    .row-meta {
+      font-size: 0.75rem;
+      color: rgba(200, 214, 240, 0.68);
+    }
+    .toggle-row {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .segmented-fieldset {
+      flex: 1 1 260px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 0.9rem 1.1rem 1.1rem;
+      margin: 0;
+      background: rgba(10, 20, 36, 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .segmented-fieldset legend {
+      padding: 0 0.4rem;
+      font-size: 0.85rem;
+      color: rgba(208, 222, 255, 0.82);
+    }
+    .segmented-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .segmented-option {
+      display: inline-flex;
+      align-items: center;
+    }
+    .segmented-option input {
+      display: none;
+    }
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .checkbox-field input {
+      width: 1rem;
+      height: 1rem;
+    }
+    .segmented-option span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.45rem 0.95rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s ease, border 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    }
+    .segmented-option input:checked + span {
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      border-color: transparent;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .gallery-grid {
+      display: grid;
+      width: 100%;
+      gap: 2rem;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    }
+    body[data-size-mode="xl"] .gallery-grid {
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 2.6rem;
+    }
+    body[data-size-mode="lg"] .gallery-grid {
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 2.4rem;
+    }
+    body[data-size-mode="md"] .gallery-grid {
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 2.1rem;
+    }
+    body[data-size-mode="xs"] .gallery-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.6rem;
+    }
+    body[data-size-mode="xxs"] .gallery-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1.3rem;
+    }
+    @media (max-width: 960px) {
+      .viewer-shell { grid-template-columns: 1fr; }
+      .sidebar-panel { position: relative; height: auto; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+      body[data-sidebar="hidden"] .viewer-shell { grid-template-columns: 1fr; }
+      body[data-sidebar="hidden"] .sidebar-panel { display: none; }
+      .sidebar-restore { bottom: 1.2rem; top: auto; }
+      .toggle-row { flex-direction: column; }
+      .segmented-fieldset { flex-basis: auto; }
+      .gallery-grid { gap: 1.6rem; }
+      body[data-size-mode="xl"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+      body[data-size-mode="lg"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      body[data-size-mode="md"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+      body[data-size-mode="xs"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+      body[data-size-mode="xxs"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .gallery-grid { gap: 1.1rem; }
+      body[data-size-mode="xl"] .gallery-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+      body[data-size-mode="lg"] .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      body[data-size-mode="md"] .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      body[data-size-mode="xs"] .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      body[data-size-mode="xxs"] .gallery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 24px 40px rgba(6, 10, 26, 0.55);
+    }
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 32px 52px rgba(8, 14, 32, 0.62);
+    }
+        .card-links {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0.6rem;
+    }
+    .card-links .pixiv-link {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.9rem;
+    }
+.rating-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .axis-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .axis-chip {
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(120, 150, 255, 0.18);
+      border: 1px solid rgba(140, 170, 255, 0.25);
+      font-size: 0.75rem;
+      color: rgba(220, 230, 255, 0.85);
+    }
+    .axis-chip-label {
+      font-size: 0.75rem;
+      color: rgba(215, 228, 255, 0.85);
+      white-space: nowrap;
+    }
+    .rating-badge.axis-badge {
+      padding: 0.22rem 0.5rem;
+      font-size: 0.75rem;
+      gap: 0.35rem;
+    }
+    .rating-badge.axis-badge.mode-bar .rating-gauge {
+      width: 100px;
+    }
+    .preview-wrapper {
+      position: relative;
+      background: rgba(0, 0, 0, 0.65);
+      border-radius: 0;
+    }
+    .preview-link {
+      display: block;
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      border: none;
+      background: transparent;
+      cursor: zoom-in;
+    }
+    .preview-link img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 5 / 7;
+      object-fit: cover;
+    }
+    .info-overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      padding: 1rem 1.1rem 0.9rem;
+      background: linear-gradient(180deg, rgba(6, 12, 24, 0.9), rgba(6, 12, 24, 0.45) 60%, transparent);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      color: #f6f8ff;
+      pointer-events: none;
+    }
+    .overlay-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.6rem;
+    }
+    .overlay-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .overlay-flags {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .overlay-pill {
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+      font-size: 0.7rem;
+      pointer-events: auto;
+    }
+    .overlay-pill.r18 { background: rgba(255, 90, 140, 0.4); }
+    .overlay-pill.ai { background: rgba(120, 255, 210, 0.35); }
+    .overlay-meta {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: rgba(220, 230, 255, 0.85);
+    }
+    .overlay-link {
+      border: none;
+      background: none;
+      color: rgba(180, 210, 255, 0.95);
+      text-decoration: underline;
+      cursor: pointer;
+      pointer-events: auto;
+      font: inherit;
+      padding: 0;
+    }
+    .overlay-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      max-height: 6rem;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+    .overlay-tag {
+      border: none;
+      border-radius: 999px;
+      padding: 0.25rem 0.55rem;
+      background: rgba(255, 255, 255, 0.18);
+      color: #f4f6ff;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .overlay-tag.custom {
+      background: rgba(140, 120, 255, 0.3);
+    }
+    .inline-editor.compact {
+      margin-top: 0.45rem;
+      padding: 0.6rem 0.75rem 0.85rem;
+      gap: 0.55rem;
+    }
+    .inline-editor.compact .inline-axes {
+      gap: 0.35rem;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
+    .inline-editor.compact select,
+    .inline-editor.compact .inline-tags-input {
+      padding: 0.35rem 0.5rem;
+      font-size: 0.78rem;
+    }
+    .inline-editor.compact label {
+      gap: 0.25rem;
+    }
+    .inline-editor.compact .inline-save {
+      padding: 0.35rem 0.8rem;
+      font-size: 0.78rem;
+    }
+    .inline-editor.compact .inline-actions {
+      gap: 0.45rem;
+    }
+    .inline-editor.compact .inline-status {
+      font-size: 0.72rem;
+    }
+    .inline-editor .inline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .inline-editor .inline-header .inline-toggle {
+      flex-shrink: 0;
+    }
+    .inline-editor .inline-header .pixiv-link {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .inline-editor .inline-header .pixiv-link:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.32);
+    }
+    .inline-editor .inline-body {
+      margin-top: 0.75rem;
+    }
+    body[data-display-mode="image"] .info-overlay {
+      display: none;
+    }
+    body[data-display-mode="image"] .card-body {
+      display: none !important;
+    }
+    body[data-display-mode="image"] figure figcaption {
+      display: none;
+    }
+    body[data-display-mode="image"] .card {
+      min-height: auto;
+    }
+    figure {
+      margin: 0;
+      background: rgba(14, 24, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    figure figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.6rem;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.8rem;
+      color: rgba(220, 230, 255, 0.72);
+      background: rgba(10, 18, 32, 0.9);
+    }
+    .card-body {
+      padding: 1.6rem 1.6rem 1.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(10, 18, 32, 0.92);
+    }
+
+      background: rgba(255, 210, 120, 0.16);
+      color: #ffe9bb;
+      border-color: rgba(255, 210, 150, 0.28);
+    }
+    .card-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.7rem;
+    }
+    .card-title { font-size: 1.1rem; font-weight: 600; }
+    .pixiv-link {
+      font-size: 0.82rem;
+      background: rgba(120, 150, 255, 0.25);
+      border-radius: 999px;
+      padding: 0.35rem 0.85rem;
+      text-decoration: none;
+    }
+    .meta-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      font-size: 0.88rem;
+      color: rgba(210, 224, 255, 0.78);
+    }
+    .meta-line.secondary {
+      font-size: 0.78rem;
+      color: rgba(200, 214, 240, 0.68);
+    }
+    .meta-button {
+      border: none;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(90, 128, 230, 0.25);
+      border: 1px solid rgba(90, 128, 230, 0.36);
+      letter-spacing: 0.03em;
+      font-size: 0.85rem;
+    }
+    .pill { background: rgba(255, 255, 255, 0.12); }
+    .pill-r18 { background: var(--badge-r18); border-color: rgba(255, 116, 156, 0.42); }
+    .pill-ai { background: var(--badge-ai); border-color: rgba(116, 255, 210, 0.42); }
+    .rating-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .rating-output { letter-spacing: 0.12em; }
+    .rating-badge.mode-stars .rating-output {
+      letter-spacing: 0.18em;
+      color: #ffd861;
+      text-shadow: 0 0 8px rgba(255, 216, 97, 0.45);
+    }
+    .rating-badge.mode-circles .rating-output { letter-spacing: 0.14em; }
+    .rating-badge.mode-squares .rating-output { letter-spacing: 0.1em; }
+    .rating-badge.mode-numeric .rating-output { letter-spacing: 0.05em; }
+    .rating-badge.mode-bar {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.35rem;
+    }
+    .rating-gauge {
+      display: none;
+      width: 140px;
+      height: 6px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.16);
+    }
+    .rating-badge.mode-bar .rating-gauge {
+      display: block;
+    }
+    .rating-gauge-fill {
+      display: block;
+      height: 100%;
+      background: linear-gradient(135deg, #ffd764, #ff9f60);
+      width: 0%;
+    }
+    .tag-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.6rem;
+    }
+    .tag-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .tag-pills[data-scrollable="list"] {
+      max-height: 6.5rem;
+      overflow-y: auto;
+      padding-right: 0.4rem;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .tag-pills[data-scrollable="list"]::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .tag-pills[data-scrollable="list"]:not([data-expanded="true"]) {
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 75%, rgba(0, 0, 0, 0));
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 75%, rgba(0, 0, 0, 0));
+    }
+    .tag-pills[data-scrollable="list"][data-expanded="true"] {
+      max-height: none;
+      overflow: visible;
+      mask-image: none;
+      -webkit-mask-image: none;
+    }
+    .tag-expand {
+      align-self: flex-start;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: inherit;
+      font: inherit;
+      font-size: 0.74rem;
+      padding: 0.28rem 0.9rem;
+      cursor: pointer;
+    }
+    .tag-expand:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+    .overlay-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      max-height: 6rem;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .overlay-tags::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .tag-button {
+      border: none;
+      border-radius: 12px;
+      background: rgba(31, 52, 86, 0.88);
+      color: inherit;
+      font: inherit;
+      padding: 0.3rem 0.7rem;
+      cursor: pointer;
+    }
+    .tag-button:hover { background: rgba(52, 82, 132, 0.95); }
+    .tag-button.custom { background: rgba(255, 210, 120, 0.25); color: #ffe7b0; }
+    .inline-editor {
+      margin-top: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 0.75rem 0.9rem;
+      background: rgba(8, 16, 30, 0.92);
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .inline-editor .inline-body[hidden] { display: none !important; }
+    .inline-toggle {
+      align-self: flex-start;
+      padding: 0.35rem 0.9rem;
+      font-size: 0.78rem;
+    }
+    .inline-editor .inline-axis-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      flex-direction: row;
+    }
+    .inline-editor .inline-axis-name {
+      font-size: 0.75rem;
+      color: rgba(208, 220, 255, 0.78);
+    }
+    .inline-editor.list { background: rgba(8, 16, 30, 0.96); }
+    .inline-editor label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.78rem;
+      color: rgba(208, 220, 255, 0.78);
+    }
+    .inline-editor select,
+    .inline-tags-input {
+      padding: 0.45rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(6, 12, 24, 0.92);
+      color: inherit;
+      font: inherit;
+    }
+    .inline-axes {
+      display: grid;
+      gap: 0.45rem;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+    .inline-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .inline-status {
+      font-size: 0.78rem;
+      color: rgba(200, 214, 240, 0.7);
+      min-width: 6rem;
+    }
+    nav.pagination {
+      margin-top: 3rem;
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    nav.pagination a,
+    nav.pagination span {
+      padding: 0.55rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      min-width: 2.4rem;
+      text-align: center;
+    }
+    nav.pagination span.current {
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      border: none;
+      color: white;
+      font-weight: 600;
+    }
+    nav.pagination span.disabled { opacity: 0.45; }
+    .empty-state {
+      padding: 5rem 1.6rem;
+      text-align: center;
+      color: rgba(210, 220, 240, 0.75);
+      border: 1px dashed rgba(255, 255, 255, 0.16);
+      border-radius: 16px;
+      background: rgba(14, 24, 40, 0.65);
+    }
+
+    .results-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-bottom: 1.8rem;
+      color: rgba(210, 222, 255, 0.78);
+      font-size: 0.9rem;
+    }
+    .results-summary span {
+      background: rgba(12, 22, 38, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 0.45rem 0.9rem;
+    }
+    .log-scroll {
+      flex: 1 1 auto;
+      width: 100%;
+      overflow: auto;
+      background: rgba(6, 12, 22, 0.78);
+      border-radius: 16px;
+      padding: 0.25rem 0.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    #log-entries {
+      margin: 0;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: rgba(6, 12, 22, 0.95);
+      font-size: 0.8rem;
+      color: rgba(208, 220, 255, 0.86);
+      overflow-y: auto;
+      max-height: 180px;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    #log-entries li {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.25rem 0;
+    }
+    #log-entries li:last-child {
+      border-bottom: none;
+    }
+    .log-meta {
+      display: inline-block;
+      margin-right: 0.4rem;
+      font-weight: 600;
+      color: rgba(170, 190, 255, 0.85);
+    }
+    .log-msg {
+      color: rgba(216, 228, 255, 0.9);
+    }
+
+    @media (min-width: 1024px) {
+      .gallery-grid {
+        gap: 2.6rem;
+      }
+      .card-body {
+      padding: 1.6rem 1.6rem 1.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(10, 18, 32, 0.92);
+    }
+    }
+    @media (max-width: 960px) {
+      header.app-header {
+        position: static;
+        padding: 1.4rem clamp(1rem, 6vw, 1.8rem);
+      }
+      .header-actions { margin-left: 0; }
+      form.filters { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+      .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+      .card-body {
+      padding: 1.6rem 1.6rem 1.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(10, 18, 32, 0.92);
+    }
+  </style>
+</head>
+<body
+  class="display-{{ display_mode }} size-{{ size_mode }}"
+  data-display-mode="{{ display_mode }}"
+  data-size-mode="{{ size_mode }}"
+  data-default-axis="{{ default_axis_id }}"
+  data-default-max="{{ default_axis_max }}"
+  data-rating-axes='{{ rating_axes_json|tojson }}'
+>
+    <button type="button" class="secondary sidebar-restore" id="restore-sidebar">サイドバーを表示</button>
+  <div class="viewer-shell">
+    <aside class="sidebar-panel">
+      <div class="sidebar-top">
+        <h1>Pixloader Viewer</h1>
+        <div class="header-actions">
+          <a class="link-button" href="{{ url_for('manage_rating_axes') }}">評価軸を管理</a>
+          <button type="button" id="sync-now-button">すぐに再取得</button>
+          <button type="button" class="secondary" id="toggle-logs">ログを見る</button>
+          <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="サイドバーを表示" data-hide-label="サイドバーを隠す">サイドバーを隠す</button>
+          <button type="button" class="secondary" id="refresh-button">一覧を更新</button>
+        </div>
+      </div>
+      <div class="status-row">
+        <div class="status-chip" id="sync-status">同期ステータスを確認しています…</div>
+        <div class="status-chip" id="metadata-status" data-pending="{{ pending_metadata }}">
+          {% if pending_metadata %}
+            未取得メタデータ: 残り {{ pending_metadata }} 件
+          {% else %}
+            メタデータは最新です
+          {% endif %}
+        </div>
+      </div>
+      <form class="filters" method="get">
+        <input type="hidden" name="page" value="{{ page }}">
+        <div class="toggle-row">
+          <fieldset class="segmented-fieldset">
+            <legend>情報表示</legend>
+            <div class="segmented-group" role="radiogroup" aria-label="情報表示">
+              {% for option in display_mode_options %}
+              <label class="segmented-option">
+                <input type="radio" name="display" value="{{ option.value }}" {{ 'checked' if display_mode == option.value else '' }}>
+                <span>{{ option.label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          <fieldset class="segmented-fieldset">
+            <legend>画像サイズ</legend>
+            <div class="segmented-group" role="radiogroup" aria-label="画像サイズ">
+              {% for option in size_mode_options %}
+              <label class="segmented-option">
+                <input type="radio" name="size" value="{{ option.value }}" {{ 'checked' if size_mode == option.value else '' }}>
+                <span>{{ option.label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+        </div>
+        <label>
+          並び順
+          <select name="sort">
+            <option value="downloaded_at" {{ 'selected' if sort == 'downloaded_at' else '' }}>ダウンロード日時</option>
+            <option value="posted_at" {{ 'selected' if sort == 'posted_at' else '' }}>投稿日時</option>
+            <option value="bookmarked_at" {{ 'selected' if sort == 'bookmarked_at' else '' }}>ブックマーク日時</option>
+            <option value="bookmarks" {{ 'selected' if sort == 'bookmarks' else '' }}>ブックマーク数</option>
+            <option value="views" {{ 'selected' if sort == 'views' else '' }}>閲覧数</option>
+            <option value="title" {{ 'selected' if sort == 'title' else '' }}>タイトル</option>
+            <option value="rating" {{ 'selected' if sort == 'rating' else '' }}>既定評価</option>
+            <option value="random" {{ 'selected' if sort == 'random' else '' }}>ランダム</option>
+            {% for axis in rating_axes %}
+            <option value="axis_{{ axis.axis_id }}" {{ 'selected' if sort == 'axis_' ~ axis.axis_id else '' }}>評価: {{ axis.name }}</option>
+            {% endfor %}
+        </select>
+        </label>
+        <label>
+          昇順 / 降順
+          <select name="order">
+            <option value="desc" {{ 'selected' if order == 'desc' else '' }}>降順</option>
+            <option value="asc" {{ 'selected' if order == 'asc' else '' }}>昇順</option>
+          </select>
+        </label>
+        <label>
+          タグ検索
+          <input type="text" name="tag" value="{{ tag or '' }}" placeholder="カンマ区切りで入力">
+        </label>
+        <label>
+          作者
+          <input type="text" name="artist" value="{{ artist or '' }}">
+        </label>
+        <label>
+          タイトル
+          <input type="text" name="title" value="{{ title or '' }}">
+        </label>
+        <label>
+          R-18
+          <select name="r18">
+            <option value="all" {{ 'selected' if r18 == 'all' else '' }}>すべて</option>
+            <option value="only" {{ 'selected' if r18 == 'only' else '' }}>R-18のみ</option>
+            <option value="exclude" {{ 'selected' if r18 == 'exclude' else '' }}>R-18を除外</option>
+          </select>
+        </label>
+        <label>
+          AI作品
+          <select name="ai">
+            <option value="all" {{ 'selected' if ai == 'all' else '' }}>すべて</option>
+            <option value="only" {{ 'selected' if ai == 'only' else '' }}>AIのみ</option>
+            <option value="exclude" {{ 'selected' if ai == 'exclude' else '' }}>AIを除外</option>
+          </select>
+        </label>
+        <label>
+          評価軸フィルター
+          <select name="rating_axis">
+            <option value="" {{ 'selected' if rating_axis is none else '' }}>指定なし</option>
+            {% for axis in rating_axes %}
+            <option value="{{ axis.axis_id }}" {{ 'selected' if rating_axis == axis.axis_id else '' }}>{{ axis.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          評価値
+          <select name="rating_value">
+            <option value="" {{ 'selected' if rating_axis is none else '' }}>指定なし</option>
+            {% for value in range(0, rating_filter_max + 1) %}
+            {% set selected_value = (rating_axis is not none) and (rating_value == value) %}
+            <option value="{{ value }}" {{ 'selected' if selected_value else '' }}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          評価比較
+          <select name="rating_compare">
+            {% for option in rating_compare_options %}
+            <option value="{{ option.value }}" {{ 'selected' if rating_compare == option.value else '' }}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="checkbox-field">
+          <input type="checkbox" name="include_unknown" value="1" {{ 'checked' if include_unknown == '1' else '' }}>
+          <span>タイトル・作者未設定を表示</span>
+        </label>
+
+        <label>
+          1ページあたり
+          <select name="per_page" id="per-page-select">
+            {% for option in per_page_options %}
+            <option value="{{ option }}" {{ 'selected' if per_page == option else '' }}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="button-cell">
+          <button type="submit" class="secondary">検索</button>
+          <button type="button" class="secondary" id="reset-button">条件をリセット</button>
+        </div>
+      </form>
+          </aside>
+    <main class="viewer-main">
+    <div class="results-summary">
+      <span>総件数: {{ pagination.total }}</span>
+      <span>ページ: {{ pagination.page }} / {{ pagination.pages }}</span>
+      <span>1ページ {{ per_page }} 件</span>
+      <span>情報表示: {{ display_label_map.get(display_mode, display_mode) }}</span>
+      <span>画像サイズ: {{ size_label_map.get(size_mode, size_mode) }}</span>
+    </div>
+    {% include 'gallery.html' %}
+  </main>
+  </div>
+
+  <div class="modal-backdrop" id="log-backdrop"></div>
+  <div class="log-modal" id="log-modal">
+    <div class="log-modal__dialog">
+      <div class="log-modal__header">
+        <h2 class="log-modal__title">最新ログ</h2>
+        <div class="log-modal__actions">
+          <button type="button" class="secondary" id="refresh-logs">最新を取得</button>
+          <button type="button" class="secondary" id="close-log-modal">閉じる</button>
+        </div>
+      </div>
+      <div class="log-scroll">
+        <ul id="log-entries"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const body = document.body;
+      const filtersForm = document.querySelector('form.filters');
+      let ratingAxesData = [];
+      try {
+        const raw = body.dataset.ratingAxes || '[]';
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          ratingAxesData = parsed;
+        }
+      } catch (error) {
+        console.warn('Failed to parse rating_axes metadata', error);
+      }
+      const ratingAxisMap = new Map(ratingAxesData.map(axis => [Number(axis.axis_id), axis]));
+      const defaultAxisId = Number(body.dataset.defaultAxis || '0');
+
+      function parseAxisScores(editor) {
+        if (!editor) {
+          return new Map();
+        }
+        try {
+          const raw = editor.dataset.axisScores || '{}';
+          const parsed = JSON.parse(raw);
+          const result = new Map();
+          if (parsed && typeof parsed === 'object') {
+            Object.entries(parsed).forEach(([key, value]) => {
+              const axisId = Number(key);
+              if (Number.isFinite(axisId)) {
+                result.set(axisId, Number(value) || 0);
+              }
+            });
+          }
+          return result;
+        } catch (error) {
+          console.warn('Failed to parse axis scores', error);
+          return new Map();
+        }
+      }
+
+      function ensureInlineAxes(editor) {
+        if (!editor || editor.dataset.axesReady === '1') {
+          return;
+        }
+        const axesContainer = editor.querySelector('.inline-axes');
+        if (!axesContainer) {
+          editor.dataset.axesReady = '1';
+          return;
+        }
+        const scoreMap = parseAxisScores(editor);
+        const defaultRating = Number(editor.dataset.defaultRating || 0);
+        axesContainer.innerHTML = '';
+        ratingAxesData.forEach(axis => {
+          const axisId = Number(axis.axis_id);
+          const wrapper = document.createElement('label');
+          wrapper.className = 'inline-axis-row';
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'inline-axis-name';
+          nameSpan.textContent = axis.name;
+          const select = document.createElement('select');
+          select.className = 'inline-axis-select';
+          select.dataset.axisId = String(axisId);
+          select.dataset.max = String(axis.max_score);
+          const maxScore = Number(axis.max_score ?? 0);
+          for (let value = 0; value <= maxScore; value += 1) {
+            const option = document.createElement('option');
+            option.value = String(value);
+            option.textContent = String(value);
+            select.appendChild(option);
+          }
+          const storedScore = scoreMap.has(axisId) ? scoreMap.get(axisId) : (axis.is_default ? defaultRating : 0);
+          select.value = String(Number.isFinite(storedScore) ? storedScore : 0);
+          wrapper.appendChild(nameSpan);
+          wrapper.appendChild(select);
+          axesContainer.appendChild(wrapper);
+        });
+        editor.dataset.axesReady = '1';
+      }
+
+      function submitFilters(form) {
+        const pageInput = form.querySelector('input[name="page"]');
+        if (pageInput) {
+          pageInput.value = '1';
+        }
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          form.submit();
+        }
+      }
+
+      if (filtersForm) {
+        const perPageSelect = filtersForm.querySelector('#per-page-select');
+        const ratingAxisSelect = filtersForm.querySelector('select[name="rating_axis"]');
+        const ratingValueSelect = filtersForm.querySelector('select[name="rating_value"]');
+        const ratingCompareSelect = filtersForm.querySelector('select[name="rating_compare"]');
+        const includeUnknownCheckbox = filtersForm.querySelector('input[name="include_unknown"]');
+        const tagInput = filtersForm.querySelector('input[name="tag"]');
+        const artistInput = filtersForm.querySelector('input[name="artist"]');
+        const sortSelect = filtersForm.querySelector('select[name="sort"]');
+        const orderSelect = filtersForm.querySelector('select[name="order"]');
+        const displayRadios = Array.from(filtersForm.querySelectorAll('input[name="display"]'));
+        const sizeRadios = Array.from(filtersForm.querySelectorAll('input[name="size"]'));
+
+        const updateOrderDisabled = () => {
+          if (!orderSelect) {
+            return;
+          }
+          const disabled = sortSelect && sortSelect.value === 'random';
+          orderSelect.disabled = disabled;
+          if (orderSelect.parentElement) {
+            orderSelect.parentElement.classList.toggle('field-disabled', disabled);
+          }
+        };
+
+        const updateDisplayDataset = () => {
+          const checked = filtersForm.querySelector('input[name="display"]:checked');
+          const value = checked ? checked.value : 'both';
+          body.dataset.displayMode = value;
+          const displayClass = Array.from(body.classList).find(cls => cls.startsWith('display-'));
+          if (displayClass) { body.classList.remove(displayClass); }
+          body.classList.add(`display-${value}`);
+        };
+
+        const updateSizeDataset = () => {
+          const checked = filtersForm.querySelector('input[name="size"]:checked');
+          const value = checked ? checked.value : 'md';
+          body.dataset.sizeMode = value;
+          const sizeClass = Array.from(body.classList).find(cls => cls.startsWith('size-'));
+          if (sizeClass) { body.classList.remove(sizeClass); }
+          body.classList.add(`size-${value}`);
+        };
+
+        if (displayRadios.length) {
+          updateDisplayDataset();
+          displayRadios.forEach((radio) => {
+            radio.addEventListener('change', () => {
+              updateDisplayDataset();
+              submitFilters(filtersForm);
+            });
+          });
+        }
+
+        if (sizeRadios.length) {
+          updateSizeDataset();
+          sizeRadios.forEach((radio) => {
+            radio.addEventListener('change', () => {
+              updateSizeDataset();
+              submitFilters(filtersForm);
+            });
+          });
+        }
+
+        if (perPageSelect) {
+          perPageSelect.addEventListener('change', () => submitFilters(filtersForm));
+        }
+
+        if (sortSelect) {
+          updateOrderDisabled();
+          sortSelect.addEventListener('change', () => {
+            updateOrderDisabled();
+            submitFilters(filtersForm);
+          });
+        } else {
+          updateOrderDisabled();
+        }
+
+        if (ratingAxisSelect) {
+          ratingAxisSelect.addEventListener('change', () => {
+            if (!ratingAxisSelect.value && ratingValueSelect) {
+              ratingValueSelect.value = '';
+            }
+            submitFilters(filtersForm);
+          });
+        }
+
+        if (ratingValueSelect) {
+          ratingValueSelect.addEventListener('change', () => submitFilters(filtersForm));
+        }
+
+        if (ratingCompareSelect) {
+          ratingCompareSelect.addEventListener('change', () => submitFilters(filtersForm));
+        }
+
+        if (includeUnknownCheckbox) {
+          includeUnknownCheckbox.addEventListener('change', () => submitFilters(filtersForm));
+        }
+
+        const resetButton = document.getElementById('reset-button');
+        if (resetButton) {
+          resetButton.addEventListener('click', () => {
+            window.location.href = window.location.pathname;
+          });
+        }
+
+        document.addEventListener('click', event => {
+          const expandButton = event.target.closest('[data-expand-tags]');
+          if (expandButton) {
+            event.preventDefault();
+            const panel = expandButton.closest('[data-tag-panel]');
+            const container = panel ? panel.querySelector('[data-scrollable="list"]') : null;
+            if (container) {
+              const expanded = container.dataset.expanded === 'true';
+              container.dataset.expanded = expanded ? 'false' : 'true';
+              updateTagPanelState(container);
+            }
+            return;
+          }
+          const tagButton = event.target.closest('[data-filter-tag]');
+          if (tagButton && tagInput) {
+            event.preventDefault();
+            tagInput.value = tagButton.dataset.filterTag || tagButton.textContent || '';
+            submitFilters(filtersForm);
+            return;
+          }
+          const artistButton = event.target.closest('[data-filter-artist]');
+          if (artistButton && artistInput) {
+            event.preventDefault();
+            artistInput.value = artistButton.dataset.filterArtist || artistButton.textContent || '';
+            submitFilters(filtersForm);
+          }
+        });
+      }
+
+      const refreshButton = document.getElementById('refresh-button');
+      if (refreshButton) {
+        refreshButton.addEventListener('click', () => window.location.reload());
+      }
+
+      const sidebarToggle = document.getElementById('toggle-sidebar-visibility');
+      const restoreSidebarBtn = document.getElementById('restore-sidebar');
+
+      const showSidebar = () => {
+        delete body.dataset.sidebar;
+        if (sidebarToggle) {
+          const hideLabel = sidebarToggle.dataset.hideLabel || 'サイドバーを隠す';
+          sidebarToggle.textContent = hideLabel;
+        }
+      };
+
+      const hideSidebar = () => {
+        body.dataset.sidebar = 'hidden';
+        if (sidebarToggle) {
+          const showLabel = sidebarToggle.dataset.showLabel || 'サイドバーを表示';
+          sidebarToggle.textContent = showLabel;
+        }
+      };
+
+      sidebarToggle?.addEventListener('click', () => {
+        const hidden = body.dataset.sidebar === 'hidden';
+        if (hidden) {
+          showSidebar();
+        } else {
+          hideSidebar();
+        }
+      });
+
+      restoreSidebarBtn?.addEventListener('click', () => {
+        showSidebar();
+        sidebarToggle?.focus();
+      });
+
+      showSidebar();
+
+      const logsModal = document.getElementById('log-modal');
+      const logsBackdrop = document.getElementById('log-backdrop');
+      const logsList = document.getElementById('log-entries');
+      const toggleLogsButton = document.getElementById('toggle-logs');
+      const refreshLogsButton = document.getElementById('refresh-logs');
+      const closeLogsButton = document.getElementById('close-log-modal');
+
+      function escapeHtml(value) {
+        return value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatLogEntry(entry) {
+        if (entry == null) {
+          return '';
+        }
+        if (typeof entry === 'string') {
+          return `<span class="log-msg">${escapeHtml(entry)}</span>`;
+        }
+        if (typeof entry === 'object') {
+          const rawTimestamp = entry.timestamp || entry.time || '';
+          let formattedTime = '';
+          if (rawTimestamp) {
+            const parsed = new Date(rawTimestamp);
+            if (!Number.isNaN(parsed.getTime())) {
+              formattedTime = parsed.toLocaleString('ja-JP', { hour12: false });
+            } else {
+              formattedTime = rawTimestamp;
+            }
+          }
+          const level = entry.level || '';
+          const loggerName = entry.name || '';
+          let message = entry.message;
+          if (typeof message !== 'string') {
+            message = message != null ? JSON.stringify(message) : '';
+          }
+          const metaParts = [formattedTime, level, loggerName].filter(Boolean).map(escapeHtml);
+          const metaHtml = metaParts.length ? `<span class="log-meta">${metaParts.join(' ')}</span>` : '';
+          const msgHtml = `<span class="log-msg">${escapeHtml(message).replace(/\n/g, '<br>')}</span>`;
+          return `${metaHtml} ${msgHtml}`.trim();
+        }
+        return `<span class="log-msg">${escapeHtml(String(entry))}</span>`;
+      }
+
+      async function loadLogs() {
+        if (!logsList) {
+          return;
+        }
+        try {
+          const response = await fetch('/api/logs?limit=200');
+          if (!response.ok) {
+            throw new Error('failed to fetch logs');
+          }
+          const data = await response.json();
+          const entries = Array.isArray(data.logs) ? data.logs : [];
+          logsList.innerHTML = entries
+            .map(item => `<li>${formatLogEntry(item)}</li>`)
+            .join('');
+        } catch (error) {
+          console.error(error);
+          logsList.innerHTML = '<li>ログの取得に失敗しました。</li>';
+        }
+      }
+
+      function setLogsModalActive(active) {
+        if (!logsModal || !logsBackdrop) {
+          return;
+        }
+        if (active) {
+          logsModal.classList.add('active');
+          logsBackdrop.classList.add('active');
+          document.body.dataset.modalOpen = 'logs';
+        } else {
+          logsModal.classList.remove('active');
+          logsBackdrop.classList.remove('active');
+          if (document.body.dataset.modalOpen === 'logs') {
+            delete document.body.dataset.modalOpen;
+          }
+        }
+      }
+
+      // Open the log modal and refresh the entries in one go.
+      async function openLogsModal() {
+        setLogsModalActive(true);
+        await loadLogs();
+      }
+
+      function closeLogsModal() {
+        setLogsModalActive(false);
+        toggleLogsButton?.focus();
+      }
+
+      toggleLogsButton?.addEventListener('click', () => {
+        openLogsModal();
+      });
+
+      closeLogsButton?.addEventListener('click', () => {
+        closeLogsModal();
+      });
+
+      logsBackdrop?.addEventListener('click', event => {
+        if (event.target === logsBackdrop) {
+          closeLogsModal();
+        }
+      });
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && logsModal?.classList.contains('active')) {
+          event.preventDefault();
+          closeLogsModal();
+        }
+      });
+
+      refreshLogsButton?.addEventListener('click', loadLogs);
+
+      const syncStatus = document.getElementById('sync-status');
+      const metadataStatus = document.getElementById('metadata-status');
+      const syncButton = document.getElementById('sync-now-button');
+
+      async function updateSyncStatus() {
+        if (!syncStatus) {
+          return;
+        }
+        try {
+          const response = await fetch('/api/sync/status');
+          if (!response.ok) {
+            throw new Error('status fetch failed');
+          }
+          const data = await response.json();
+          if (data.in_progress) {
+            syncStatus.textContent = '同期を実行中です…';
+          } else if (data.last_finished_at) {
+            syncStatus.textContent = `最終同期: ${String(data.last_finished_at).replace('T', ' ')}`;
+          } else if (data.last_started_at) {
+            syncStatus.textContent = `最後の開始: ${String(data.last_started_at).replace('T', ' ')}`;
+          } else {
+            syncStatus.textContent = '同期待ちです';
+          }
+          if (metadataStatus) {
+            const pending = Number(data.pending_metadata) || 0;
+            metadataStatus.dataset.pending = String(pending);
+            metadataStatus.textContent = pending
+              ? `不足メタデータ: 残り ${pending} 件`
+              : 'メタデータは最新です';
+          }
+        } catch (error) {
+          console.error(error);
+          syncStatus.textContent = '同期ステータスの取得に失敗しました';
+        }
+      }
+
+      if (syncButton) {
+        const originalText = syncButton.textContent || '今すぐ再取得';
+        syncButton.addEventListener('click', async () => {
+          syncButton.disabled = true;
+          syncButton.textContent = '再取得要求中…';
+          try {
+            const response = await fetch('/api/sync/start', { method: 'POST' });
+            if (!response.ok) {
+              throw new Error('failed to start sync');
+            }
+            syncButton.textContent = '再取得を要求しました';
+            await updateSyncStatus();
+          } catch (error) {
+            console.error(error);
+            syncButton.textContent = '再取得に失敗しました';
+          } finally {
+            setTimeout(() => {
+              syncButton.disabled = false;
+              syncButton.textContent = originalText;
+            }, 4000);
+          }
+        });
+      }
+
+      updateSyncStatus();
+      setInterval(updateSyncStatus, 15000);
+
+      function renderBadge(badge) {
+        if (!badge) {
+          return;
+        }
+        const output = badge.querySelector('.rating-output');
+        const gauge = badge.querySelector('.rating-gauge');
+        const fill = badge.querySelector('.rating-gauge-fill');
+        const rawScore = Number(badge.dataset.score || '0');
+        const max = Number(badge.dataset.max || '5') || 1;
+        const mode = badge.dataset.displayMode || 'stars';
+        const score = Math.max(0, Math.min(max, Math.round(rawScore)));
+        const ratio = Math.max(0, Math.min(1, score / max));
+        if (fill) {
+          fill.style.width = `${Math.round(ratio * 100)}%`;
+        }
+        if (gauge) {
+          gauge.style.display = mode === 'bar' ? 'block' : 'none';
+        }
+        const modeClasses = ['stars', 'circles', 'squares', 'numeric', 'bar'];
+        modeClasses.forEach(name => {
+          badge.classList.toggle(`mode-${name}`, mode === name);
+        });
+        if (!output) {
+          return;
+        }
+        let text;
+        switch (mode) {
+          case 'stars': {
+            const empty = Math.max(0, max - score);
+            text = '★'.repeat(score) + '☆'.repeat(empty);
+            break;
+          }
+          case 'circles': {
+            const empty = Math.max(0, max - score);
+            text = '●'.repeat(score) + '○'.repeat(empty);
+            break;
+          }
+          case 'squares': {
+            const empty = Math.max(0, max - score);
+            text = '■'.repeat(score) + '□'.repeat(empty);
+            break;
+          }
+          case 'bar':
+            text = `${Math.round(ratio * 100)}%`;
+            break;
+          case 'numeric':
+          default:
+            text = `${score} / ${max}`;
+            break;
+        }
+        output.textContent = text;
+      }
+
+      function renderAllBadges() {
+        document.querySelectorAll('[data-rating-badge]').forEach(renderBadge);
+      }
+
+      function renderTagButtons(container, pixivTags, customTags) {
+        if (!container) {
+          return;
+        }
+        container.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        pixivTags.forEach(tag => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'tag-button';
+          button.dataset.filterTag = tag;
+          button.textContent = tag;
+          fragment.appendChild(button);
+        });
+        customTags.forEach(tag => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'tag-button custom';
+          button.dataset.filterTag = tag;
+          button.textContent = `#${tag}`;
+          fragment.appendChild(button);
+        });
+        container.appendChild(fragment);
+        const total = pixivTags.length + customTags.length;
+        container.dataset.tagCount = String(total);
+        if (!container.dataset.expanded) {
+          container.dataset.expanded = 'false';
+        }
+        updateTagPanelState(container);
+      }
+
+      function renderOverlayTagButtons(container, pixivTags, customTags) {
+        if (!container) {
+          return;
+        }
+        container.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        pixivTags.forEach(tag => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'overlay-tag';
+          button.dataset.filterTag = tag;
+          button.textContent = tag;
+          fragment.appendChild(button);
+        });
+        customTags.forEach(tag => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'overlay-tag custom';
+          button.dataset.filterTag = tag;
+          button.textContent = `#${tag}`;
+          fragment.appendChild(button);
+        });
+        container.appendChild(fragment);
+      }
+
+      function updateTagPanelState(container) {
+        const panel = container.closest('[data-tag-panel]');
+        if (!panel) {
+          return;
+        }
+        const expandButton = panel.querySelector('[data-expand-tags]');
+        const threshold = Number(panel.dataset.threshold || '12');
+        const total = Number(container.dataset.tagCount || '0');
+        const expanded = container.dataset.expanded === 'true';
+        panel.dataset.expanded = expanded ? 'true' : 'false';
+        if (!expandButton) {
+          return;
+        }
+        if (total > threshold) {
+          expandButton.hidden = false;
+          expandButton.textContent = expanded ? 'タグを折りたたむ' : 'タグをすべて表示';
+        } else {
+          expandButton.hidden = true;
+          container.dataset.expanded = 'true';
+          panel.dataset.expanded = 'true';
+        }
+      }
+
+      function initializeTagPanels() {
+        document.querySelectorAll('[data-tags]').forEach(container => {
+          if (!container.dataset.tagCount) {
+            const total = container.querySelectorAll('button').length;
+            container.dataset.tagCount = String(total);
+          }
+          if (!container.dataset.expanded) {
+            container.dataset.expanded = 'false';
+          }
+          updateTagPanelState(container);
+        });
+      }
+
+      function updateCardAfterSave(illustId, payload) {
+        const axes = Array.isArray(payload.axes) ? payload.axes : [];
+        const customTags = Array.isArray(payload.custom_tags) ? payload.custom_tags : [];
+        const scoreMapPayload = {};
+        axes.forEach(item => {
+          if (item && typeof item.axis_id !== 'undefined') {
+            scoreMapPayload[item.axis_id] = Number(item.score || 0);
+          }
+        });
+        const editor = document.querySelector(`[data-inline-editor][data-illust-id="${illustId}"]`);
+        if (editor) {
+          editor.dataset.axisScores = JSON.stringify(scoreMapPayload);
+          if (typeof scoreMapPayload[defaultAxisId] !== 'undefined') {
+            editor.dataset.defaultRating = String(scoreMapPayload[defaultAxisId]);
+          } else if (typeof payload.rating !== 'undefined') {
+            editor.dataset.defaultRating = String(Number(payload.rating) || 0);
+          }
+          editor.dataset.customTags = customTags.join(', ');
+        }
+        document
+          .querySelectorAll(`[data-inline-editor][data-illust-id="${illustId}"] .inline-tags-input`)
+          .forEach(input => {
+            input.value = customTags.join(', ');
+          });
+
+        document
+          .querySelectorAll(`[data-inline-editor][data-illust-id="${illustId}"] .inline-axis-select`)
+          .forEach(select => {
+            const axisId = Number(select.dataset.axisId);
+            const axis = axes.find(item => Number(item.axis_id) === axisId);
+            if (axis) {
+              select.value = String(axis.score ?? 0);
+            }
+          });
+
+        // Re-render every rating badge attached to the illustration so new scores become visible.
+        document
+          .querySelectorAll(`[data-rating-badge][data-illust-id="${illustId}"]`)
+          .forEach(badge => {
+            const axisId = Number(badge.dataset.axisId);
+            let axisData = axes.find(item => Number(item.axis_id) === axisId);
+            if (!axisData) {
+              axisData = axes.find(item => item.is_default);
+            }
+            if (!axisData) {
+              const mapped = ratingAxisMap.get(axisId) || ratingAxisMap.get(defaultAxisId);
+              if (mapped) {
+                axisData = {
+                  axis_id: mapped.axis_id,
+                  score: axisId === mapped.axis_id ? Number(badge.dataset.score || 0) : 0,
+                  max_score: mapped.max_score,
+                  display_mode: mapped.display_mode,
+                };
+              }
+            }
+            if (axisData) {
+              if (axisData.max_score != null) {
+                badge.dataset.max = String(axisData.max_score);
+              }
+              if (axisData.display_mode) {
+                badge.dataset.displayMode = axisData.display_mode;
+              }
+              badge.dataset.score = String(axisData.score ?? 0);
+              renderBadge(badge);
+            }
+          });
+
+        document
+          .querySelectorAll(`.axis-chip[data-illust-id="${illustId}"]`)
+          .forEach(chip => {
+            const axisId = Number(chip.dataset.axisId);
+            const axisData = axes.find(item => Number(item.axis_id) === axisId);
+            if (!axisData) {
+              return;
+            }
+            const chipLabel = chip.querySelector('.axis-chip-label');
+            if (chipLabel) {
+              chipLabel.textContent = axisData.name;
+            }
+            const axisBadge = chip.querySelector('[data-rating-badge]');
+            if (axisBadge) {
+              axisBadge.dataset.score = String(axisData.score ?? 0);
+              if (axisData.max_score != null) {
+                axisBadge.dataset.max = String(axisData.max_score);
+              }
+              if (axisData.display_mode) {
+                axisBadge.dataset.displayMode = axisData.display_mode;
+              }
+              renderBadge(axisBadge);
+            }
+          });
+
+        document
+          .querySelectorAll(`[data-tags][data-illust-id="${illustId}"]`)
+          .forEach(container => {
+            const pixivTags = (container.dataset.pixivTags || '')
+              .split(',')
+              .map(tag => tag.trim())
+              .filter(Boolean);
+            container.dataset.customTags = customTags.join(', ');
+            renderTagButtons(container, pixivTags, customTags);
+            updateTagPanelState(container);
+          });
+
+        document
+          .querySelectorAll(`[data-overlay-tags][data-illust-id="${illustId}"]`)
+          .forEach(container => {
+            const pixivTags = (container.dataset.pixivTags || '')
+              .split(',')
+              .map(tag => tag.trim())
+              .filter(Boolean);
+            container.dataset.customTags = customTags.join(', ');
+            renderOverlayTagButtons(container, pixivTags, customTags);
+          });
+
+      }
+
+      function bindInlineEditors() {
+        document.querySelectorAll('[data-inline-editor]').forEach(editor => {
+          const toggleButton = editor.querySelector('.inline-toggle');
+          const bodySection = editor.querySelector('.inline-body');
+          const saveButton = editor.querySelector('.inline-save');
+          const statusLabel = editor.querySelector('.inline-status');
+          const tagsInput = editor.querySelector('.inline-tags-input');
+          const collapsedLabel = toggleButton?.dataset.collapsedLabel || 'クイック編集';
+          const expandedLabel = toggleButton?.dataset.expandedLabel || '閉じる';
+
+          if (tagsInput && editor.dataset.customTags && !tagsInput.dataset.initialized) {
+            tagsInput.value = editor.dataset.customTags;
+            tagsInput.dataset.initialized = '1';
+          }
+
+          const openEditor = () => {
+            ensureInlineAxes(editor);
+            if (bodySection) {
+              bodySection.removeAttribute('hidden');
+            }
+            if (toggleButton) {
+              toggleButton.textContent = expandedLabel;
+              toggleButton.dataset.state = 'open';
+            }
+          };
+
+          const closeEditor = () => {
+            if (bodySection) {
+              bodySection.setAttribute('hidden', '');
+            }
+            if (toggleButton) {
+              toggleButton.textContent = collapsedLabel;
+              toggleButton.dataset.state = 'closed';
+            }
+          };
+
+          if (toggleButton && bodySection) {
+            toggleButton.textContent = collapsedLabel;
+            toggleButton.dataset.state = 'closed';
+            toggleButton.addEventListener('click', () => {
+              if (bodySection.hasAttribute('hidden')) {
+                openEditor();
+              } else {
+                closeEditor();
+              }
+            });
+          }
+
+          if (!saveButton) {
+            return;
+          }
+
+          saveButton.addEventListener('click', async () => {
+            ensureInlineAxes(editor);
+            const illustId = Number(editor.dataset.illustId);
+            const axisSelects = Array.from(editor.querySelectorAll('.inline-axis-select'));
+            const axesPayload = axisSelects.map(select => ({
+              axis_id: Number(select.dataset.axisId),
+              score: Number(select.value || '0'),
+            }));
+            const defaultSelect = axisSelects.find(select => Number(select.dataset.axisId) === defaultAxisId);
+            const rating = defaultSelect ? Number(defaultSelect.value || '0') : 0;
+            const customTags = tagsInput
+              ? tagsInput.value
+                  .split(',')
+                  .map(tag => tag.trim())
+                  .filter(Boolean)
+              : [];
+            if (statusLabel) {
+              statusLabel.textContent = '保存中…';
+            }
+            try {
+              const response = await fetch(`/api/illust/${illustId}/meta`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ custom_tags: customTags, rating, axes: axesPayload }),
+              });
+              if (!response.ok) {
+                throw new Error('failed to update metadata');
+              }
+              const result = await response.json();
+              updateCardAfterSave(illustId, result);
+              if (statusLabel) {
+                statusLabel.textContent = '保存しました';
+                setTimeout(() => {
+                  statusLabel.textContent = '';
+                }, 2500);
+              }
+              editor.dataset.customTags = customTags.join(', ');
+            } catch (error) {
+              console.error(error);
+              if (statusLabel) {
+                statusLabel.textContent = '保存に失敗しました';
+              }
+            }
+          });
+        });
+      }
+      renderAllBadges();
+      initializeTagPanels();
+      bindInlineEditors();
+    })();
+  </script>
+</body>
+</html>

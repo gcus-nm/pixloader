@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>評価軸の管理 - Pixloader Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #081020;
+      color: #eef3ff;
+      min-height: 100vh;
+    }
+    header {
+      padding: clamp(1.5rem, 4vw, 2.6rem);
+      background: rgba(10, 20, 36, 0.95);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+    header h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+    }
+    header a {
+      color: rgba(150, 200, 255, 0.9);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    header a:hover {
+      text-decoration: underline;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: clamp(1.2rem, 4vw, 2.8rem);
+      display: flex;
+      flex-direction: column;
+      gap: 1.8rem;
+    }
+    form.axis-create,
+    form.axis-update {
+      background: rgba(16, 28, 48, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 1.1rem 1.3rem;
+      display: grid;
+      gap: 0.9rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      align-items: end;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.88rem;
+      color: rgba(235, 240, 255, 0.75);
+    }
+    input,
+    select {
+      padding: 0.55rem 0.7rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(10, 20, 36, 0.9);
+      color: inherit;
+      font: inherit;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 0.55rem 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: inherit;
+      background: linear-gradient(135deg, #436dff, #784dff);
+    }
+    button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(16, 28, 48, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 0.75rem 0.95rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background: rgba(18, 32, 56, 0.82);
+      font-weight: 600;
+      color: rgba(235, 240, 255, 0.8);
+    }
+    tbody tr:hover {
+      background: rgba(52, 84, 140, 0.16);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      font-size: 0.78rem;
+    }
+    .message {
+      padding: 0.7rem 1rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+    }
+    .message.success {
+      background: rgba(130, 210, 170, 0.18);
+      border: 1px solid rgba(130, 210, 170, 0.45);
+      color: rgba(190, 240, 210, 0.96);
+    }
+    .message.error {
+      background: rgba(255, 140, 140, 0.2);
+      border: 1px solid rgba(255, 140, 140, 0.38);
+      color: rgba(255, 210, 210, 0.96);
+    }
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="{{ url_for('index') }}">&larr; 一覧に戻る</a>
+    <h1>評価軸の管理</h1>
+    <p style="margin:0;color:rgba(235,240,255,0.7);font-size:0.95rem;">
+      カスタム評価軸を追加・更新して、ギャラリーや詳細画面での採点方法を柔軟に切り替えられます。
+    </p>
+  </header>
+  <main>
+    {% if message %}
+    <div class="message success">{{ message }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="message error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="axis-create">
+      <input type="hidden" name="action" value="create">
+      <label>
+        評価軸名
+        <input type="text" name="name" placeholder="例: キャラクター、総合" required>
+      </label>
+      <label>
+        最大スコア
+        <input type="number" name="max_score" min="1" value="5" required>
+      </label>
+      <label>
+        表示方法
+        <select name="display_mode">
+          {% for mode in display_modes %}
+          <option value="{{ mode }}">{{ {
+            'stars': '星 (★)',
+            'circles': '丸 (●)',
+            'squares': '四角 (■)',
+            'numeric': '数値表示',
+            'bar': 'ゲージ'
+          }[mode] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">追加</button>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:30%">名称</th>
+          <th style="width:18%">最大スコア</th>
+          <th style="width:20%">表示方法</th>
+          <th style="width:14%">既定</th>
+          <th style="width:18%">操作</th>
+        </tr>
+      </thead>
+            <tbody>
+        {% for axis in axes %}
+        {% set form_id = 'axis-form-' ~ axis.axis_id %}
+        <form id="{{ form_id }}" method="post" class="axis-update">
+          <input type="hidden" name="action" value="update">
+          <input type="hidden" name="axis_id" value="{{ axis.axis_id }}">
+        </form>
+        <tr>
+          <td>{{ axis.name }}</td>
+          <td>
+            <input form="{{ form_id }}" type="number" name="max_score" min="1" value="{{ axis.max_score }}">
+          </td>
+          <td>
+            <select form="{{ form_id }}" name="display_mode">
+              {% for mode in display_modes %}
+              <option value="{{ mode }}" {{ 'selected' if axis.display_mode == mode else '' }}>{{ {
+                'stars': '星 (★)',
+                'circles': '丸 (●)',
+                'squares': '四角 (■)',
+                'numeric': '数値表示',
+                'bar': 'ゲージ'
+              }[mode] }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>{% if axis.is_default %}<span class="badge">既定</span>{% else %}--{% endif %}</td>
+          <td>
+            <div class="actions">
+              <button type="submit" form="{{ form_id }}" class="secondary">更新</button>
+              {% if not axis.is_default %}
+              <a class="danger-link" href="{{ url_for('manage_rating_axes', delete=axis.axis_id) }}" onclick="return confirm('本当に削除しますか？');">削除</a>
+              {% else %}
+              <span style="color:rgba(235,240,255,0.6);">保存済み</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

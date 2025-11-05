@@ -1,0 +1,309 @@
+{% if illustrations %}
+  {% set default_display_mode = default_axis.display_mode %}
+  <div class="view-panel" data-panel="text">
+    <div class="list-wrapper">
+      <table class="list-table">
+        <thead>
+          <tr>
+            <th style="width:28%">作品</th>
+            <th style="width:18%">投稿日 / ブクマ日</th>
+            <th style="width:16%">作者</th>
+            <th style="width:10%">フラグ</th>
+            <th style="width:20%">クイック編集</th>
+            <th style="width:6%">ブクマ</th>
+            <th style="width:6%">閲覧</th>
+            <th style="width:8%">Pixiv</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in illustrations %}
+          {% set default_score = item.ratings.get(default_axis_id, item.rating) %}
+          {% set secondary_axes = rating_axes | selectattr('axis_id', 'ne', default_axis_id) | list %}
+          {% set total_tags = item.tags|length + item.custom_tags|length %}
+          <tr class="list-row" data-illust-id="{{ item.illust_id }}">
+            <td class="col-title">
+              <a href="{{ url_for('view_illust', illust_id=item.illust_id, **request.args.to_dict()) }}">{{ item.title or 'タイトル未設定' }}</a>
+              <div class="row-meta">DL: {{ item.last_downloaded_at or '-' }}</div>
+              <div class="row-meta">ID: {{ item.illust_id }}</div>
+            </td>
+            <td>
+              <div class="row-meta">投稿: {{ item.posted_at or '-' }}</div>
+              <div class="row-meta">ブクマ: {{ item.bookmarked_at or '-' }}</div>
+            </td>
+            <td>
+              {% if item.artist %}
+              <button type="button" class="meta-button" data-filter-artist="{{ item.artist }}">{{ item.artist }}</button>
+              {% else %}
+              <span>作者不明</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.is_r18 %}<span class="pill pill-r18">R-18</span>{% endif %}
+              {% if item.is_ai %}<span class="pill pill-ai">AI</span>{% endif %}
+            </td>
+            <td>
+              <div class="rating-stack">
+                <span
+                  class="badge rating-badge"
+                  data-rating-badge
+                  data-illust-id="{{ item.illust_id }}"
+                  data-axis-id="{{ default_axis_id }}"
+                  data-display-mode="{{ default_display_mode }}"
+                  data-max="{{ default_axis.max_score }}"
+                  data-score="{{ default_score }}"
+                >
+                  <span class="rating-output"></span>
+                  <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
+                </span>
+              </div>
+              {% if secondary_axes %}
+              <div class="axis-chips">
+                {% for axis in secondary_axes %}
+                {% set axis_score = item.ratings.get(axis.axis_id, 0) %}
+                <div class="axis-chip" data-illust-id="{{ item.illust_id }}" data-axis-id="{{ axis.axis_id }}">
+                  <span class="axis-chip-label">{{ axis.name }}</span>
+                  <span
+                    class="badge rating-badge axis-badge"
+                    data-rating-badge
+                    data-illust-id="{{ item.illust_id }}"
+                    data-axis-id="{{ axis.axis_id }}"
+                    data-display-mode="{{ axis.display_mode }}"
+                    data-max="{{ axis.max_score }}"
+                    data-score="{{ axis_score }}"
+                  >
+                    <span class="rating-output"></span>
+                    <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
+                  </span>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+              <div
+                class="inline-editor list"
+                data-inline-editor
+                data-illust-id="{{ item.illust_id }}"
+                data-axis-scores="{{ item.ratings|tojson|e }}"
+                data-default-rating="{{ item.ratings.get(default_axis_id, item.rating)|default(0, true) }}"
+                data-custom-tags="{{ item.custom_tags|join(', ')|e }}"
+              >
+                <div class="inline-header">
+                  <button
+                    type="button"
+                    class="inline-toggle secondary"
+                    data-collapsed-label="クイック編集"
+                    data-expanded-label="閉じる"
+                  >
+                    クイック編集
+                  </button>
+                  <a class="pixiv-link" href="https://www.pixiv.net/artworks/{{ item.illust_id }}" target="_blank" rel="noopener">Pixiv</a>
+                </div>
+                <div class="inline-body" hidden>
+                  <div class="inline-axes"></div>
+                  <label class="inline-tags-label">
+                    <span>独自タグ</span>
+                    <input type="text" class="inline-tags-input" value="{{ item.custom_tags|join(', ') }}" placeholder="例: お気に入り, 再閲覧用">
+                  </label>
+                  <div class="inline-actions">
+                    <button type="button" class="inline-save">保存</button>
+                    <span class="inline-status"></span>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ item.bookmark_count }}</td>
+            <td>{{ item.view_count }}</td>
+            <td><a href="https://www.pixiv.net/artworks/{{ item.illust_id }}" target="_blank" rel="noopener">開く</a></td>
+          </tr>
+          <tr class="list-tags-row" data-illust-id="{{ item.illust_id }}">
+            <td colspan="8">
+              <div class="tag-panel" data-tag-panel data-threshold="12">
+                <div
+                  class="tag-pills"
+                  data-tags
+                  data-scrollable="list"
+                  data-expanded="false"
+                  data-illust-id="{{ item.illust_id }}"
+                  data-pixiv-tags="{{ item.tags|join(', ') }}"
+                  data-custom-tags="{{ item.custom_tags|join(', ') }}"
+                >
+                  {% for tag in item.tags %}
+                  <button type="button" class="tag-button" data-filter-tag="{{ tag }}">{{ tag }}</button>
+                  {% endfor %}
+                  {% for tag in item.custom_tags %}
+                  <button type="button" class="tag-button custom" data-filter-tag="{{ tag }}">#{{ tag }}</button>
+                  {% endfor %}
+                </div>
+                <button type="button" class="tag-expand secondary" data-expand-tags {% if total_tags <= 12 %}hidden{% endif %}>タグをすべて表示</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view-panel" data-panel="grid">
+    <div class="gallery-grid">
+      {% for item in illustrations %}
+      {% set default_score = item.ratings.get(default_axis_id, item.rating) %}
+      {% set secondary_axes = rating_axes | selectattr('axis_id', 'ne', default_axis_id) | list %}
+      {% set total_tags = item.tags|length + item.custom_tags|length %}
+      <article class="card" data-illust-id="{{ item.illust_id }}">
+        <figure>
+          <div class="preview-wrapper">
+            <a
+              class="preview-link"
+              href="{{ url_for('view_illust', illust_id=item.illust_id, **request.args.to_dict()) }}"
+            >
+              <img src="{{ url_for('serve_file', path=item.cover_path) }}" alt="{{ item.title or 'イラスト' }}">
+            </a>
+            <div
+              class="info-overlay"
+              data-info
+              data-illust-id="{{ item.illust_id }}"
+              data-pixiv-tags="{{ item.tags|join(', ') }}"
+              data-custom-tags="{{ item.custom_tags|join(', ') }}"
+            >
+              <div class="overlay-top">
+                <span class="overlay-title">{{ item.title or 'タイトル未設定' }}</span>
+                <div class="overlay-flags">
+                  {% if item.is_r18 %}<span class="overlay-pill r18">R-18</span>{% endif %}
+                  {% if item.is_ai %}<span class="overlay-pill ai">AI</span>{% endif %}
+                </div>
+              </div>
+              <div class="overlay-meta">
+                {% if item.artist %}
+                <button type="button" class="overlay-link" data-filter-artist="{{ item.artist }}">{{ item.artist }}</button>
+                {% else %}
+                <span class="overlay-link disabled">作者不明</span>
+                {% endif %}
+                <span>ブクマ {{ item.bookmark_count }}</span>
+                <span>閲覧 {{ item.view_count }}</span>
+              </div>
+              <div
+                class="overlay-tags"
+                data-overlay-tags
+                data-illust-id="{{ item.illust_id }}"
+                data-scrollable="card"
+                data-pixiv-tags="{{ item.tags|join(', ') }}"
+                data-custom-tags="{{ item.custom_tags|join(', ') }}"
+              >
+                {% for tag in item.tags %}
+                <button type="button" class="overlay-tag" data-filter-tag="{{ tag }}">{{ tag }}</button>
+                {% endfor %}
+                {% for tag in item.custom_tags %}
+                <button type="button" class="overlay-tag custom" data-filter-tag="{{ tag }}">#{{ tag }}</button>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>ページ数 {{ item.count }}</span>
+            <span>ID {{ item.illust_id }}</span>
+          </figcaption>
+        </figure>
+        <div class="card-body">
+          <div class="rating-stack">
+            <span
+              class="badge rating-badge"
+              data-rating-badge
+              data-illust-id="{{ item.illust_id }}"
+              data-axis-id="{{ default_axis_id }}"
+              data-display-mode="{{ default_display_mode }}"
+              data-max="{{ default_axis.max_score }}"
+              data-score="{{ default_score }}"
+            >
+              <span class="rating-output"></span>
+              <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
+            </span>
+          </div>
+          {% if secondary_axes %}
+          <div class="axis-chips">
+            {% for axis in secondary_axes %}
+            {% set axis_score = item.ratings.get(axis.axis_id, 0) %}
+            <div class="axis-chip" data-illust-id="{{ item.illust_id }}" data-axis-id="{{ axis.axis_id }}">
+              <span class="axis-chip-label">{{ axis.name }}</span>
+              <span
+                class="badge rating-badge axis-badge"
+                data-rating-badge
+                data-illust-id="{{ item.illust_id }}"
+                data-axis-id="{{ axis.axis_id }}"
+                data-display-mode="{{ axis.display_mode }}"
+                data-max="{{ axis.max_score }}"
+                data-score="{{ axis_score }}"
+              >
+                <span class="rating-output"></span>
+                <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div
+            class="inline-editor compact"
+            data-inline-editor
+            data-illust-id="{{ item.illust_id }}"
+            data-axis-scores="{{ item.ratings|tojson|e }}"
+            data-default-rating="{{ item.ratings.get(default_axis_id, item.rating)|default(0, true) }}"
+            data-custom-tags="{{ item.custom_tags|join(', ')|e }}"
+          >
+            <div class="inline-header">
+              <button
+                type="button"
+                class="inline-toggle secondary"
+                data-collapsed-label="クイック編集"
+                data-expanded-label="閉じる"
+              >
+                クイック編集
+              </button>
+              <a class="pixiv-link" href="https://www.pixiv.net/artworks/{{ item.illust_id }}" target="_blank" rel="noopener">Pixiv</a>
+            </div>
+            <div class="inline-body" hidden>
+              <div class="inline-axes"></div>
+              <label class="inline-tags-label">
+                <span>独自タグ</span>
+                <input type="text" class="inline-tags-input" value="{{ item.custom_tags|join(', ') }}" placeholder="例: お気に入り, 再閲覧用">
+              </label>
+              <div class="inline-actions">
+                <button type="button" class="inline-save">保存</button>
+                <span class="inline-status"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+
+  <nav class="pagination">
+    {% if pagination.has_prev %}
+    <a href="{{ build_url(page=1) }}">&laquo; 最初</a>
+    <a href="{{ build_url(page=pagination.page - 1) }}">&lsaquo; 前</a>
+    {% else %}
+    <span class="disabled">&laquo; 最初</span>
+    <span class="disabled">&lsaquo; 前</span>
+    {% endif %}
+
+    {% for p in pagination.window %}
+      {% if p == pagination.page %}
+      <span class="current">{{ p }}</span>
+      {% else %}
+      <a href="{{ build_url(page=p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if pagination.has_next %}
+    <a href="{{ build_url(page=pagination.page + 1) }}">次 &rsaquo;</a>
+    <a href="{{ build_url(page=pagination.pages) }}">最後 &raquo;</a>
+    {% else %}
+    <span class="disabled">次 &rsaquo;</span>
+    <span class="disabled">最後 &raquo;</span>
+    {% endif %}
+  </nav>
+{% else %}
+  <div class="empty-state">
+    <p>まだイラストが見つかりません。Pixivブックマークの同期を実行してください。</p>
+  </div>
+{% endif %}

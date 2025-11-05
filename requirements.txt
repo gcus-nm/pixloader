@@ -1,0 +1,5 @@
+pixivpy3==3.7.2
+requests==2.31.0
+tenacity==8.2.3
+python-dotenv==1.0.1
+Flask==3.0.3

@@ -1,0 +1,28 @@
+﻿# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Virtual environments
+.venv/
+
+# Local environment files
+.env
+*.env.local
+
+# Application data
+.data/
+data/
+downloads/
+cache/
+app/.serena/
+tmp_gppt/
+
+# Tooling scratch files
+temp_patch.txt
+tmp_find.py
+
+# Docker
+*.pid
