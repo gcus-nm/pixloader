@@ -42,13 +42,26 @@ class DownloadManager:
                     continue
 
                 for task in tasks:
-                    if self._registry.is_downloaded(task.illust_id, task.page_index):
+                    target_dir = self._download_root / task.directory_name
+                    target_path = target_dir / task.filename
+                    record_exists = self._registry.is_downloaded(task.illust_id, task.page_index)
+                    file_exists = target_path.exists()
+
+                    if record_exists and file_exists:
                         LOGGER.debug(
                             "Skipping already-downloaded illustration %s page %s",
                             task.illust_id,
                             task.page_index,
                         )
                         continue
+
+                    if record_exists and not file_exists:
+                        LOGGER.warning(
+                            "Download record exists for %s page %s but file is missing; scheduling re-download.",
+                            task.illust_id,
+                            task.page_index,
+                        )
+
                     pending.add(executor.submit(self._download_single, task))
 
                     if len(pending) >= self._max_workers * 4:
