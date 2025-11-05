@@ -12,10 +12,11 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+# Copy the application source (including helper scripts) into the image.
+COPY . ./
 
 VOLUME ["/data"]
 ENV PIXLOADER_DOWNLOAD_DIR=/data/downloads
