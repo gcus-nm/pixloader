@@ -15,6 +15,7 @@ class DownloadRegistry:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
         self._conn.execute(
             """
             CREATE TABLE IF NOT EXISTS downloads (
@@ -212,6 +213,42 @@ class DownloadRegistry:
                 ),
             )
             self._conn.commit()
+
+    def iter_downloads(self) -> Iterator[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT
+                    illust_id,
+                    page,
+                    file_path,
+                    illust_title,
+                    artist_name,
+                    tags,
+                    bookmark_count,
+                    view_count,
+                    is_r18,
+                    is_ai,
+                    create_date,
+                    bookmarked_at
+                FROM downloads
+                """
+            ).fetchall()
+        for row in rows:
+            yield {
+                "illust_id": row["illust_id"],
+                "page": row["page"],
+                "file_path": row["file_path"],
+                "illust_title": row["illust_title"],
+                "artist_name": row["artist_name"],
+                "tags": json.loads(row["tags"] or "[]"),
+                "bookmark_count": row["bookmark_count"],
+                "view_count": row["view_count"],
+                "is_r18": bool(row["is_r18"]) if row["is_r18"] is not None else None,
+                "is_ai": bool(row["is_ai"]) if row["is_ai"] is not None else None,
+                "create_date": row["create_date"],
+                "bookmarked_at": row["bookmarked_at"],
+            }
 
     def mark_metadata_synced(self, illust_id: int) -> None:
         with self._lock:

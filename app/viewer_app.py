@@ -1,17 +1,25 @@
 ﻿from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 import sqlite3
+import threading
+from http import HTTPStatus
 import unicodedata
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Sequence
 
 from .logging_utils import LogBuffer
+from .config import Config
+from .maintenance import verify_files
 from .sync_controller import SyncController
 
+
+LOGGER = logging.getLogger(__name__)
 
 from flask import (
     Flask,
@@ -139,6 +147,58 @@ def create_viewer_app(
         {"value": "le", "label": "以下 (≦)"},
     ]
     rating_display_modes = {"stars", "circles", "squares", "numeric", "bar"}
+
+    maintenance_lock = threading.Lock()
+    maintenance_state = {
+        "running": False,
+        "last_started_at": None,
+        "last_finished_at": None,
+        "checked": 0,
+        "missing": 0,
+        "repaired": 0,
+        "failed": 0,
+        "message": None,
+    }
+    maintenance_thread: threading.Thread | None = None
+
+    def _update_maintenance(**kwargs) -> None:
+        with maintenance_lock:
+            maintenance_state.update(kwargs)
+
+    def _maintenance_snapshot() -> dict[str, object]:
+        with maintenance_lock:
+            return dict(maintenance_state)
+
+    def _run_file_verification() -> None:
+        nonlocal maintenance_thread
+
+        def progress_callback(checked: int, missing: int, repaired: int, failed: int) -> None:
+            _update_maintenance(checked=checked, missing=missing, repaired=repaired, failed=failed)
+
+        try:
+            config = Config.load(require_token=True)
+            result = verify_files(config, repair=True, progress_callback=progress_callback)
+            message = None if result.failed == 0 else '一部のファイルを修復できませんでした。詳細はログを確認してください。'
+            _update_maintenance(
+                running=False,
+                last_finished_at=datetime.utcnow().isoformat(),
+                checked=result.checked,
+                missing=result.missing,
+                repaired=result.repaired,
+                failed=result.failed,
+                message=message,
+            )
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error('File verification failed: %s', exc, exc_info=True)
+            _update_maintenance(
+                running=False,
+                last_finished_at=datetime.utcnow().isoformat(),
+                message=str(exc),
+            )
+        finally:
+            with maintenance_lock:
+                maintenance_thread = None
+
 
     def _connect() -> sqlite3.Connection:
         conn = sqlite3.connect(database_path, timeout=10, check_same_thread=False)
@@ -863,6 +923,33 @@ def create_viewer_app(
         if sync_controller is None:
             abort(503)
         sync_controller.request_sync()
+        return jsonify({'ok': True})
+
+    @app.route('/api/maintenance/status')
+    def api_maintenance_status():
+        return jsonify(_maintenance_snapshot())
+
+    @app.route('/api/maintenance/verify-files', methods=['POST'])
+    def api_maintenance_verify_files():
+        nonlocal maintenance_thread
+        if sync_controller is not None:
+            status = sync_controller.get_status()
+            if status.in_progress:
+                return jsonify({'ok': False, 'message': '同期中は実行できません。'}), HTTPStatus.CONFLICT
+        with maintenance_lock:
+            if maintenance_state['running']:
+                return jsonify({'ok': False, 'message': '整合性チェックは進行中です。'}), HTTPStatus.CONFLICT
+            _update_maintenance(
+                running=True,
+                last_started_at=datetime.utcnow().isoformat(),
+                message=None,
+                checked=0,
+                missing=0,
+                repaired=0,
+                failed=0,
+            )
+            maintenance_thread = threading.Thread(target=_run_file_verification, daemon=True)
+            maintenance_thread.start()
         return jsonify({'ok': True})
 
     @app.route('/api/logs')
