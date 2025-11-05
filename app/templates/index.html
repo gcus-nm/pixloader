@@ -126,6 +126,47 @@
       font-size: 0.9rem;
       color: rgba(210, 222, 255, 0.92);
     }
+    .maintenance-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      padding: 1rem 1.2rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(12, 20, 38, 0.9);
+    }
+    .maintenance-panel .maintenance-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .maintenance-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .maintenance-actions button {
+      flex: 1 1 160px;
+    }
+    .maintenance-panel h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f3f7ff;
+    }
+    .maintenance-status {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      white-space: pre-line;
+    }
+    .maintenance-hint {
+      margin: 0;
+      font-size: 0.75rem;
+      color: rgba(200, 210, 230, 0.7);
+    }
     form.filters {
       display: grid;
       gap: 1rem;
@@ -1011,6 +1052,19 @@
           {% endif %}
         </div>
       </div>
+      <div class="maintenance-panel">
+        <div class="maintenance-header">
+          <h2>メンテナンス</h2>
+          <div class="maintenance-actions">
+            <button type="button" id="verify-files-button">整合性チェックを実行</button>
+            <button type="button" id="verify-bookmarks-button">ブックマーク照合を実行</button>
+          </div>
+        </div>
+        <p class="maintenance-status" id="maintenance-status">まだメンテナンスは実行されていません。</p>
+        <p class="maintenance-hint">ダウンロード済みの作品と保存先を照合し、欠落があれば自動で再取得します。</p>
+        <p class="maintenance-hint">ブックマーク一覧と保存状況を照合し、未取得の作品をダウンロードします。</p>
+      </div>
+
       <form class="filters" method="get">
         <input type="hidden" name="page" value="{{ page }}">
         <div class="toggle-row">
@@ -1484,72 +1538,149 @@
             throw new Error('failed to fetch logs');
           }
           const data = await response.json();
-          const entries = Array.isArray(data.logs) ? data.logs : [];
-          logsList.innerHTML = entries
-            .map(item => `<li>${formatLogEntry(item)}</li>`)
-            .join('');
+          const running = Boolean(data.running);
+          const task = typeof data.task === 'string' ? data.task : null;
+          const taskLabel = task === 'bookmarks' ? 'ブックマーク照合' : '整合性チェック';
+          const checked = Number(data.checked || 0);
+          const missing = Number(data.missing || 0);
+          const repaired = Number(data.repaired || 0);
+          const failed = Number(data.failed || 0);
+          if (verifyFilesButton) {
+            const runningThis = running && task === 'files';
+            verifyFilesButton.disabled = running;
+            if (runningThis) {
+              verifyFilesButton.textContent = 'チェック中…';
+            } else if (running) {
+              verifyFilesButton.textContent = '他の処理を実行中…';
+            } else {
+              verifyFilesButton.textContent = '整合性チェックを実行';
+            }
+          }
+          if (verifyBookmarksButton) {
+            const runningThis = running && task === 'bookmarks';
+            verifyBookmarksButton.disabled = running;
+            if (runningThis) {
+              verifyBookmarksButton.textContent = 'チェック中…';
+            } else if (running) {
+              verifyBookmarksButton.textContent = '他の処理を実行中…';
+            } else {
+              verifyBookmarksButton.textContent = 'ブックマーク照合を実行';
+            }
+          }
+          let message;
+          if (running) {
+            message = ${taskLabel}を実行中… 確認済み  件 / 欠落  件 / 再取得  件;
+            if (failed) {
+              message +=  / 失敗  件;
+            }
+          } else if (data.last_finished_at) {
+            const finishedAt = String(data.last_finished_at).replace('T', ' ');
+            message = ${taskLabel}の最終実行:  / 確認済み  件;
+            if (missing || repaired || failed) {
+              message +=  / 欠落  件 / 再取得  件;
+              if (failed) {
+                message +=  / 失敗  件;
+              }
+            } else {
+              message += ' / 問題は見つかりませんでした';
+            }
+          } else if (data.last_started_at) {
+            const startedAt = String(data.last_started_at).replace('T', ' ');
+            message = ${taskLabel}の前回開始: ;
+          } else {
+            message = ${taskLabel}はまだ実行されていません;
+          }
+          if (data.message) {
+            message += `\n${data.message}`;
+          }
+          maintenanceStatus.textContent = message;
         } catch (error) {
           console.error(error);
-          logsList.innerHTML = '<li>ログの取得に失敗しました。</li>';
-        }
-      }
-
-      function setLogsModalActive(active) {
-        if (!logsModal || !logsBackdrop) {
-          return;
-        }
-        if (active) {
-          logsModal.classList.add('active');
-          logsBackdrop.classList.add('active');
-          document.body.dataset.modalOpen = 'logs';
-        } else {
-          logsModal.classList.remove('active');
-          logsBackdrop.classList.remove('active');
-          if (document.body.dataset.modalOpen === 'logs') {
-            delete document.body.dataset.modalOpen;
+          maintenanceStatus.textContent = '整合性ステータスの取得に失敗しました';
+          if (verifyFilesButton) {
+            verifyFilesButton.disabled = false;
+            verifyFilesButton.textContent = '整合性チェックを実行';
           }
         }
       }
 
-      // Open the log modal and refresh the entries in one go.
-      async function openLogsModal() {
-        setLogsModalActive(true);
-        await loadLogs();
-      }
-
-      function closeLogsModal() {
-        setLogsModalActive(false);
-        toggleLogsButton?.focus();
-      }
-
-      toggleLogsButton?.addEventListener('click', () => {
-        openLogsModal();
-      });
-
-      closeLogsButton?.addEventListener('click', () => {
-        closeLogsModal();
-      });
-
-      logsBackdrop?.addEventListener('click', event => {
-        if (event.target === logsBackdrop) {
-          closeLogsModal();
+      verifyFilesButton?.addEventListener('click', async () => {
+        if (!verifyFilesButton || verifyFilesButton.disabled) {
+          return;
+        }
+        const originalText = verifyFilesButton.textContent || '整合性チェックを実行';
+        verifyFilesButton.disabled = true;
+        verifyFilesButton.textContent = 'チェックを開始しています…';
+        if (maintenanceStatus) {
+          maintenanceStatus.textContent = '整合性チェックを開始しています…';
+        }
+        try {
+          const response = await fetch('/api/maintenance/verify-files', { method: 'POST' });
+          if (!response.ok) {
+            let message = '整合性チェックの開始に失敗しました';
+            try {
+              const data = await response.json();
+              if (data && data.message) {
+                message = data.message;
+              }
+            } catch (parseError) {
+              // ignore JSON parse errors
+            }
+            throw new Error(message);
+          }
+        } catch (error) {
+          console.error(error);
+          verifyFilesButton.disabled = false;
+          verifyFilesButton.textContent = originalText;
+          if (maintenanceStatus) {
+            maintenanceStatus.textContent = error.message || '整合性チェックの開始に失敗しました';
+          }
+        } finally {
+          await updateMaintenanceStatus();
+          if (verifyFilesButton && !verifyFilesButton.disabled) {
+            verifyFilesButton.textContent = originalText;
+          }
         }
       });
 
-      document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && logsModal?.classList.contains('active')) {
-          event.preventDefault();
-          closeLogsModal();
+      verifyBookmarksButton?.addEventListener('click', async () => {
+        if (!verifyBookmarksButton || verifyBookmarksButton.disabled) {
+          return;
+        }
+        const originalText = verifyBookmarksButton.textContent || 'ブックマーク照合を実行';
+        verifyBookmarksButton.disabled = true;
+        verifyBookmarksButton.textContent = 'チェックを開始しています…';
+        if (maintenanceStatus) {
+          maintenanceStatus.textContent = 'ブックマーク照合を開始しています…';
+        }
+        try {
+          const response = await fetch('/api/maintenance/verify-bookmarks', { method: 'POST' });
+          if (!response.ok) {
+            let message = 'ブックマーク照合の開始に失敗しました';
+            try {
+              const data = await response.json();
+              if (data && data.message) {
+                message = data.message;
+              }
+            } catch (parseError) {
+              // ignore JSON parse errors
+            }
+            throw new Error(message);
+          }
+        } catch (error) {
+          console.error(error);
+          verifyBookmarksButton.disabled = false;
+          verifyBookmarksButton.textContent = originalText;
+          if (maintenanceStatus) {
+            maintenanceStatus.textContent = error.message || 'ブックマーク照合の開始に失敗しました';
+          }
+        } finally {
+          await updateMaintenanceStatus();
+          if (verifyBookmarksButton && !verifyBookmarksButton.disabled) {
+            verifyBookmarksButton.textContent = originalText;
+          }
         }
       });
-
-      refreshLogsButton?.addEventListener('click', loadLogs);
-
-      const syncStatus = document.getElementById('sync-status');
-      const metadataStatus = document.getElementById('metadata-status');
-      const maintenanceStatus = document.getElementById('maintenance-status');
-      const syncButton = document.getElementById('sync-now-button');
-      const verifyFilesButton = document.getElementById('verify-files-button');
 
       async function updateSyncStatus() {
         if (!syncStatus) {

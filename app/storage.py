@@ -98,6 +98,15 @@ class DownloadRegistry:
             row = cursor.fetchone()
         return row is not None
 
+    def has_illustration(self, illust_id: int) -> bool:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT 1 FROM downloads WHERE illust_id = ? LIMIT 1",
+                (illust_id,),
+            )
+            row = cursor.fetchone()
+        return row is not None
+
     def record_download(
         self,
         illust_id: int,

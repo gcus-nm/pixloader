@@ -73,7 +73,7 @@ PIXLOADER_HOST_ROOT=D:\\pixiv\\bookmarks
 | 変数名 | 既定値 | 説明 |
 | --- | --- | --- |
 | `PIXIV_REFRESH_TOKEN` | **必須** | Pixiv のリフレッシュトークン。.env で設定するかブラウザ入力で登録します。 |
-| `PIXIV_BOOKMARK_RESTRICT` | `public` | `public` または `private` を指定。 |
+| PIXIV_BOOKMARK_RESTRICT | public | public / private / Both を指定します。Both を選ぶと公開・非公開の両方をまとめて取得します。|
 | `PIXLOADER_DOWNLOAD_DIR` | `/data` (Docker 時) | 画像を保存するディレクトリ。通常は変更不要です。 |
 | `PIXLOADER_DB_PATH` | `<download_dir>/pixloader.db` | ダウンロード履歴を保持する SQLite ファイル。 |
 | `PIXLOADER_TOKEN_FILE` | `<download_dir>/refresh_token.txt` | リフレッシュトークンを保存するパス。 |

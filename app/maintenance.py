@@ -22,6 +22,14 @@ class VerifyFilesResult:
     failed: int
 
 
+@dataclass
+class VerifyBookmarksResult:
+    checked: int
+    missing: int
+    repaired: int
+    failed: int
+
+
 ProgressCallback = Callable[[int, int, int, int], None]
 
 
@@ -129,11 +137,126 @@ def verify_files(
     )
 
 
+def verify_bookmarks(
+    config: Config,
+    *,
+    repair: bool = True,
+    progress_callback: ProgressCallback | None = None,
+) -> VerifyBookmarksResult:
+    LOGGER.info("Starting bookmark verification for Pixiv user collection")
+
+    service = PixivBookmarkService(
+        refresh_token=config.refresh_token or "",
+        restrict=config.bookmark_restrict,
+        max_pages=0,
+    )
+    service.authenticate()
+
+    checked = 0
+    missing = 0
+    repaired = 0
+    failed = 0
+
+    with DownloadRegistry(config.database_path) as registry:
+        for illust in service.iter_bookmarks():
+            checked += 1
+            illust_id = int(illust.get("id", 0))
+            if illust_id <= 0:
+                LOGGER.warning("Encountered illust without valid id: %r", illust)
+                continue
+
+            if registry.has_illustration(illust_id):
+                if progress_callback and checked % 50 == 0:
+                    progress_callback(checked, missing, repaired, failed)
+                continue
+
+            missing += 1
+            if progress_callback:
+                progress_callback(checked, missing, repaired, failed)
+
+            if not repair:
+                continue
+
+            detail = illust
+            if "meta_pages" not in detail or "image_urls" not in detail:
+                detail = service.fetch_illust_detail(illust_id) or illust
+
+            tasks = service.expand_illust_to_tasks(detail)
+            if not tasks:
+                LOGGER.warning("No downloadable tasks generated for missing illustration %s", illust_id)
+                failed += 1
+                if progress_callback:
+                    progress_callback(checked, missing, repaired, failed)
+                continue
+
+            download_success = True
+            for task in tasks:
+                target_dir = config.download_dir / task.directory_name
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_path = target_dir / task.filename
+                if target_path.exists():
+                    LOGGER.debug("File already present on disk during bookmark verify: %s", target_path)
+                else:
+                    if not service.download_image(task, target_path):
+                        LOGGER.error(
+                            "Failed to redownload illustration %s page %s during bookmark verification",
+                            task.illust_id,
+                            task.page_index,
+                        )
+                        download_success = False
+                        continue
+
+                registry.record_download(
+                    task.illust_id,
+                    task.page_index,
+                    str(target_path),
+                    illust_title=task.title,
+                    artist_name=task.artist_name,
+                    tags=task.tags,
+                    bookmark_count=task.bookmark_count,
+                    view_count=task.view_count,
+                    is_r18=task.is_r18,
+                    is_ai=task.is_ai,
+                    create_date=task.create_date,
+                    bookmarked_at=task.bookmarked_at,
+                )
+
+            if download_success:
+                repaired += 1
+            else:
+                failed += 1
+
+            if progress_callback:
+                progress_callback(checked, missing, repaired, failed)
+
+    return VerifyBookmarksResult(
+        checked=checked,
+        missing=missing,
+        repaired=repaired if repair else 0,
+        failed=failed if repair else missing,
+    )
+
+
 def _cmd_verify(ns: argparse.Namespace) -> None:
     config = Config.load(require_token=True)
     result = verify_files(config, repair=not ns.no_repair)
     print(
         "Checked: {checked}\nMissing: {missing}\nRepaired: {repaired}\nFailed: {failed}".format(
+            checked=result.checked,
+            missing=result.missing,
+            repaired=result.repaired,
+            failed=result.failed,
+        )
+    )
+    if result.failed and ns.strict:
+        raise SystemExit(1)
+
+
+def _cmd_verify_bookmarks(ns: argparse.Namespace) -> None:
+    config = Config.load(require_token=True)
+    result = verify_bookmarks(config, repair=not ns.no_repair)
+    print(
+        "Checked: {checked}\nMissing: {missing}\nDownloaded: {repaired}\nFailed: {failed}".format(
             checked=result.checked,
             missing=result.missing,
             repaired=result.repaired,
@@ -153,6 +276,22 @@ def main(argv: list[str] | None = None) -> None:
     verify_parser.add_argument("--no-repair", action="store_true", help="Only report missing files without re-downloading")
     verify_parser.add_argument("--strict", action="store_true", help="Exit with non-zero status if any failures are encountered")
     verify_parser.set_defaults(func=_cmd_verify)
+
+    verify_bookmarks_parser = sub.add_parser(
+        "verify-bookmarks",
+        help="Ensure every Pixiv bookmark has been downloaded and optionally fetch missing items",
+    )
+    verify_bookmarks_parser.add_argument(
+        "--no-repair",
+        action="store_true",
+        help="Only report missing bookmarks without downloading them",
+    )
+    verify_bookmarks_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with non-zero status if missing bookmarks remain after the run",
+    )
+    verify_bookmarks_parser.set_defaults(func=_cmd_verify_bookmarks)
 
     args = parser.parse_args(argv)
     args.func(args)
