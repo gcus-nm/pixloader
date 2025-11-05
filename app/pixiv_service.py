@@ -152,11 +152,16 @@ class PixivBookmarkService:
                 break
             parsed = urlparse(next_url)
             query = parse_qs(parsed.query)
-            max_items = query.get("max_bookmark_id")
-            if not max_items:
-                LOGGER.info("Next URL lacks max_bookmark_id; stopping pagination.")
+            next_max = (
+                query.get("max_bookmark_id")
+                or query.get("bookmark_id")
+                or query.get("bookmarked_id")
+                or query.get("last_id")
+            )
+            if not next_max:
+                LOGGER.info("Next URL lacks max bookmark identifier; stopping pagination. next_url=%s", next_url)
                 break
-            max_bookmark_id = max_items[0]
+            max_bookmark_id = next_max[0]
 
     def fetch_illust_detail(self, illust_id: int) -> Dict | None:
         try:
