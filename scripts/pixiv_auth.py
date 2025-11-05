@@ -51,7 +51,7 @@ def print_auth_token_response(response):
     print("expires_in:", data.get("expires_in", 0))
 
 
-def login():
+def login(open_browser: bool = True) -> None:
     code_verifier, code_challenge = oauth_pkce(s256)
     login_params = {
         "code_challenge": code_challenge,
@@ -59,7 +59,21 @@ def login():
         "client": "pixiv-android",
     }
 
-    open_url(f"{LOGIN_URL}?{urlencode(login_params)}")
+    login_url = f"{LOGIN_URL}?{urlencode(login_params)}"
+
+    if open_browser:
+        try:
+            opened = open_url(login_url)
+        except Exception:
+            opened = False
+        if opened:
+            print("Opened your default browser. Complete the Pixiv login and copy the resulting code parameter.")
+        else:
+            print("Failed to launch a browser automatically. Open this URL manually:")
+            print(login_url)
+    else:
+        print("Open the following URL in your browser to authorize Pixiv access:")
+        print(login_url)
 
     try:
         code = input("code: ").strip()
@@ -103,7 +117,12 @@ def main():
     subparsers = parser.add_subparsers()
     parser.set_defaults(func=lambda _: parser.print_usage())
     login_parser = subparsers.add_parser("login")
-    login_parser.set_defaults(func=lambda _: login())
+    login_parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Print the authorization URL instead of trying to launch a browser.",
+    )
+    login_parser.set_defaults(func=lambda ns: login(open_browser=not ns.no_browser))
     refresh_parser = subparsers.add_parser("refresh")
     refresh_parser.add_argument("refresh_token")
     refresh_parser.set_defaults(func=lambda ns: refresh(ns.refresh_token))
