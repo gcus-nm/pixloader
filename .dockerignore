@@ -13,3 +13,10 @@ dist/
 .vscode/
 .DS_Store
 node_modules/
+# Runtime data and local environment files
+.env
+.env.*
+data/
+downloads/
+tmp_gppt/
+app/.serena/
