@@ -8,7 +8,7 @@ Pixloader は、Pixiv のブックマーク一覧を定期的に取得し、画�
 - ブクマしたpixivの画像をローカルPCにダウンロードする
   - これを見なくて済むようにしたい  
 
-    ![image](image\sakujo-zumi.png)
+    ![image](image/sakujo-zumi.png)
 - 自分用にブクマ画像を整理。自分だけのタグ付けや、評価をつけられる  
 （実際のpixivのサービスには影響しない）
   - 独自に評価を追加することも可能。「かわいさ」とか「かっこよさ」みたいな
@@ -28,7 +28,7 @@ https://www.docker.com/ja-jp/products/docker-desktop/
     docker compose up -d --build
     ```
     Docker DesktopのContainersから、起動していることを確認  
-    ![image](image\docker-desktop.png)
+    ![image](image/docker-desktop.png)
 
 1. 初回設定  
 http://localhost:8080 にアクセス  
@@ -36,7 +36,7 @@ pixivにログインから自分のアカウントでログイン
 
     白い画面に飛ばされるが、F12キーなどで開発者ツールを確認  
     Consoleで `code=` と `&via=login` の間のコードをコピー
-    ![alt text](image\dev-tool.png)
+    ![alt text](image/dev-tool.png)
 
     http://localhost:8080 の`コールバックURLまたは認証コード`欄にペーストしたら、`トークン取得`をクリック  
 
