@@ -1538,6 +1538,33 @@
             throw new Error('failed to fetch logs');
           }
           const data = await response.json();
+          const entries = Array.isArray(data.logs) ? data.logs : [];
+          logsList.innerHTML = entries
+            .map(item => `<li>${formatLogEntry(item)}</li>`)
+            .join('');
+        } catch (error) {
+          console.error(error);
+          logsList.innerHTML = '<li>ログの取得に失敗しました</li>';
+        }
+      }
+
+      const syncStatus = document.getElementById('sync-status');
+      const metadataStatus = document.getElementById('metadata-status');
+      const maintenanceStatus = document.getElementById('maintenance-status');
+      const syncButton = document.getElementById('sync-now-button');
+      const verifyFilesButton = document.getElementById('verify-files-button');
+      const verifyBookmarksButton = document.getElementById('verify-bookmarks-button');
+
+      async function updateMaintenanceStatus() {
+        if (!maintenanceStatus) {
+          return;
+        }
+        try {
+          const response = await fetch('/api/maintenance/status');
+          if (!response.ok) {
+            throw new Error('failed to fetch maintenance status');
+          }
+          const data = await response.json();
           const running = Boolean(data.running);
           const task = typeof data.task === 'string' ? data.task : null;
           const taskLabel = task === 'bookmarks' ? 'ブックマーク照合' : '整合性チェック';
@@ -1545,6 +1572,7 @@
           const missing = Number(data.missing || 0);
           const repaired = Number(data.repaired || 0);
           const failed = Number(data.failed || 0);
+
           if (verifyFilesButton) {
             const runningThis = running && task === 'files';
             verifyFilesButton.disabled = running;
@@ -1567,28 +1595,29 @@
               verifyBookmarksButton.textContent = 'ブックマーク照合を実行';
             }
           }
+
           let message;
           if (running) {
-            message = ${taskLabel}を実行中… 確認済み  件 / 欠落  件 / 再取得  件;
+            message = `${taskLabel}を実行中… 確認済み ${checked} 件 / 欠落 ${missing} 件 / 再取得 ${repaired} 件`;
             if (failed) {
-              message +=  / 失敗  件;
+              message += ` / 失敗 ${failed} 件`;
             }
           } else if (data.last_finished_at) {
             const finishedAt = String(data.last_finished_at).replace('T', ' ');
-            message = ${taskLabel}の最終実行:  / 確認済み  件;
+            message = `${taskLabel}の最終実行: ${finishedAt} / 確認済み ${checked} 件`;
             if (missing || repaired || failed) {
-              message +=  / 欠落  件 / 再取得  件;
+              message += ` / 欠落 ${missing} 件 / 再取得 ${repaired} 件`;
               if (failed) {
-                message +=  / 失敗  件;
+                message += ` / 失敗 ${failed} 件`;
               }
             } else {
               message += ' / 問題は見つかりませんでした';
             }
           } else if (data.last_started_at) {
             const startedAt = String(data.last_started_at).replace('T', ' ');
-            message = ${taskLabel}の前回開始: ;
+            message = `${taskLabel}の前回開始: ${startedAt}`;
           } else {
-            message = ${taskLabel}はまだ実行されていません;
+            message = `${taskLabel}はまだ実行されていません`;
           }
           if (data.message) {
             message += `\n${data.message}`;
@@ -1596,10 +1625,14 @@
           maintenanceStatus.textContent = message;
         } catch (error) {
           console.error(error);
-          maintenanceStatus.textContent = '整合性ステータスの取得に失敗しました';
+          maintenanceStatus.textContent = 'メンテナンスステータスの取得に失敗しました';
           if (verifyFilesButton) {
             verifyFilesButton.disabled = false;
             verifyFilesButton.textContent = '整合性チェックを実行';
+          }
+          if (verifyBookmarksButton) {
+            verifyBookmarksButton.disabled = false;
+            verifyBookmarksButton.textContent = 'ブックマーク照合を実行';
           }
         }
       }
@@ -1681,7 +1714,6 @@
           }
         }
       });
-
       async function updateSyncStatus() {
         if (!syncStatus) {
           return;
@@ -1750,10 +1782,12 @@
         const output = badge.querySelector('.rating-output');
         const gauge = badge.querySelector('.rating-gauge');
         const fill = badge.querySelector('.rating-gauge-fill');
-        const rawScore = Number(badge.dataset.score || '0');
-        const max = Number(badge.dataset.max || '5') || 1;
+        const rawScore = Number(badge.dataset.score ?? '0');
+        const rawMax = Number(badge.dataset.max ?? '5');
+        const max = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 1;
         const mode = badge.dataset.displayMode || 'stars';
-        const score = Math.max(0, Math.min(max, Math.round(rawScore)));
+        const safeScore = Number.isFinite(rawScore) ? rawScore : 0;
+        const score = Math.max(0, Math.min(max, Math.round(safeScore)));
         const ratio = Math.max(0, Math.min(1, score / max));
         if (fill) {
           fill.style.width = `${Math.round(ratio * 100)}%`;
