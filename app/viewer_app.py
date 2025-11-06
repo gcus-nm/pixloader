@@ -172,6 +172,12 @@ def create_viewer_app(
         "message": None,
         "cursor": None,
         "batches": 0,
+        "limit": 100,
+        "latest_title": None,
+        "latest_illust_id": None,
+        "latest_artist": None,
+        "latest_bookmarked_at": None,
+        "latest_url": None,
     }
     recent_thread: threading.Thread | None = None
 
@@ -1007,7 +1013,7 @@ def create_viewer_app(
         with recent_lock:
             return dict(recent_state)
 
-    def _start_recent_fetch() -> tuple[bool, str | None]:
+    def _start_recent_fetch(limit: int) -> tuple[bool, str | None]:
         nonlocal recent_thread
         if sync_controller is not None:
             status = sync_controller.get_status()
@@ -1021,8 +1027,9 @@ def create_viewer_app(
         with recent_lock:
             if recent_state["running"]:
                 return False, "A recent fetch is already running."
-            cursor_state = recent_state.get("cursor")
-            LOGGER.info("Starting recent bookmark fetch (cursor=%s)", cursor_state)
+            recent_state["limit"] = limit
+            cursor_state = None
+            LOGGER.info("Starting recent bookmark fetch (cursor=%s, limit=%s)", cursor_state, limit)
             _update_recent(
                 running=True,
                 last_started_at=datetime.utcnow().isoformat(),
@@ -1031,6 +1038,13 @@ def create_viewer_app(
                 downloaded=0,
                 skipped=0,
                 message="Fetching recent bookmarks...",
+                cursor=cursor_state,
+                batches=0,
+                latest_title=None,
+                latest_illust_id=None,
+                latest_artist=None,
+                latest_bookmarked_at=None,
+                latest_url=None,
             )
 
             def progress_callback(processed: int, skipped: int, downloaded: int, _failed: int) -> None:
@@ -1042,29 +1056,42 @@ def create_viewer_app(
                     config = Config.load(require_token=True)
                     result = fetch_recent_batch(
                         config,
-                        cursor_state=previous_cursor,
-                        limit=100,
+                        cursor_state=None,
+                        limit=limit,
                         progress_callback=progress_callback,
                     )
                     with recent_lock:
                         batches = int(recent_state.get("batches", 0))
                     if result.processed:
                         batches += 1
+                    limit_snapshot = limit
                     if result.downloaded:
-                        message = f"Downloaded {result.downloaded} new items."
+                        message = f"Downloaded {result.downloaded} new item(s) from the latest {limit_snapshot} bookmark(s)."
                     elif result.processed:
-                        message = "No new items were downloaded."
+                        message = f"No new items found within the latest {limit_snapshot} bookmark(s)."
                     else:
-                        message = "No bookmarks were available to fetch."
+                        message = f"No bookmarks were available within the latest {limit_snapshot} entries."
+                    latest_payload = result.latest_illust or {}
+                    latest_id = latest_payload.get("id")
+                    if isinstance(latest_id, str):
+                        try:
+                            latest_id = int(latest_id)
+                        except ValueError:
+                            pass
                     _update_recent(
                         running=False,
                         last_finished_at=datetime.utcnow().isoformat(),
                         processed=result.processed,
                         downloaded=result.downloaded,
                         skipped=result.skipped,
-                        cursor=result.next_state,
+                        cursor=None,
                         batches=batches,
                         message=message,
+                        latest_title=(latest_payload.get("title") or None) if latest_payload else None,
+                        latest_illust_id=latest_id if latest_id else None,
+                        latest_artist=(latest_payload.get("artist") or None) if latest_payload else None,
+                        latest_bookmarked_at=(latest_payload.get("bookmarked_at") or None) if latest_payload else None,
+                        latest_url=(latest_payload.get("url") or None) if latest_payload else None,
                     )
                     LOGGER.info(
                         "Recent fetch finished: processed=%s downloaded=%s skipped=%s next_cursor=%s",
@@ -1096,8 +1123,14 @@ def create_viewer_app(
     @app.route('/api/recent/fetch', methods=['POST'])
     def api_recent_fetch():
         LOGGER.info('Handling /api/recent/fetch request')
-        LOGGER.info('API call: /api/recent/fetch')
-        ok, message = _start_recent_fetch()
+        payload = request.get_json(silent=True) or {}
+        try:
+            limit_value = int(payload.get("limit", 100))
+        except (TypeError, ValueError):
+            limit_value = 100
+        limit_value = max(1, min(limit_value, 500))
+        LOGGER.info('API call: /api/recent/fetch (limit=%s)', limit_value)
+        ok, message = _start_recent_fetch(limit_value)
         if not ok:
             LOGGER.info('Recent fetch request failed: %s', message)
             return jsonify({'ok': False, 'message': message}), HTTPStatus.CONFLICT

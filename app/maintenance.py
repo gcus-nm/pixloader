@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Dict, Any
 
 from .config import Config
 from .pixiv_service import ImageTask, PixivBookmarkService
@@ -36,10 +36,32 @@ class FetchRecentResult:
     downloaded: int
     skipped: int
     next_state: dict | None
-    latest_illust: dict | None
+    latest_illust: Dict[str, Any] | None
 
 
 ProgressCallback = Callable[[int, int, int, int], None]
+
+
+def _summarize_latest_illust(illust: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a compact payload describing the freshest bookmark."""
+    user = illust.get("user") or {}
+    illust_id = int(illust.get("id", 0) or 0)
+    bookmark_entry = illust.get("bookmark_data") or {}
+    bookmark_timestamp = (
+        bookmark_entry.get("timestamp")
+        or bookmark_entry.get("created_time")
+        or bookmark_entry.get("time")
+        or bookmark_entry.get("date")
+        or illust.get("bookmark_date")
+    )
+
+    return {
+        "id": illust_id if illust_id > 0 else None,
+        "title": (illust.get("title") or "").strip(),
+        "artist": (user.get("name") or "").strip() if isinstance(user, dict) else "",
+        "bookmarked_at": str(bookmark_timestamp) if bookmark_timestamp else None,
+        "url": f"https://www.pixiv.net/artworks/{illust_id}" if illust_id > 0 else None,
+    }
 
 
 def verify_files(
@@ -253,6 +275,7 @@ def fetch_recent_batch(
     limit: int = 100,
     progress_callback: ProgressCallback | None = None,
 ) -> FetchRecentResult:
+    limit = max(1, min(int(limit), 500))
     LOGGER.info("Fetching recent bookmarks batch (limit=%s, cursor=%s)", limit, cursor_state)
 
     service = PixivBookmarkService(
@@ -265,11 +288,15 @@ def fetch_recent_batch(
     processed = 0
     downloaded = 0
     skipped = 0
+    latest_summary: Dict[str, Any] | None = None
 
     with DownloadRegistry(config.database_path) as registry:
         batch, next_state = service.fetch_bookmark_batch(state=cursor_state, limit=limit)
-        latest_illust = batch[0] if batch else None
-        for illust in batch:
+        if cursor_state is None:
+            next_state = None
+        for index, illust in enumerate(batch):
+            if index == 0:
+                latest_summary = _summarize_latest_illust(illust)
             processed += 1
             tasks = service.expand_illust_to_tasks(illust)
             if not tasks:
@@ -322,7 +349,7 @@ def fetch_recent_batch(
         downloaded=downloaded,
         skipped=skipped,
         next_state=next_state,
-        latest_illust=latest_illust,
+        latest_illust=latest_summary,
     )
 
 

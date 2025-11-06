@@ -1036,12 +1036,33 @@
       <div class="sidebar-top">
         <h1>Pixloader Viewer</h1>
         <div class="header-actions">
-          <a class="link-button" href="{{ url_for('manage_rating_axes') }}">評価軸を管理</a>
-          <button type="button" id="sync-now-button">すぐに再取得</button>
-          <button type="button" class="secondary" id="fetch-recent-button">直近100件を取得</button>
-          <button type="button" class="secondary" id="toggle-logs">ログを見る</button>
-          <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="サイドバーを表示" data-hide-label="サイドバーを隠す">サイドバーを隠す</button>
-          <button type="button" class="secondary" id="refresh-button">一覧を更新</button>
+          <a class="link-button" href="{{ url_for('manage_rating_axes') }}">Manage rating axes</a>
+          <button type="button" id="sync-now-button">Sync now</button>
+          <input
+            type="number"
+            id="fetch-recent-limit"
+            class="secondary select-inline"
+            min="1"
+            max="500"
+            step="25"
+            value="100"
+            list="fetch-recent-presets"
+            aria-label="Number of recent bookmarks to fetch"
+          >
+          <datalist id="fetch-recent-presets">
+            <option value="25">Latest 25</option>
+            <option value="50">Latest 50</option>
+            <option value="75">Latest 75</option>
+            <option value="100">Latest 100</option>
+            <option value="150">Latest 150</option>
+            <option value="200">Latest 200</option>
+            <option value="300">Latest 300</option>
+            <option value="500">Latest 500</option>
+          </datalist>
+          <button type="button" class="secondary" id="fetch-recent-button">Fetch latest 100</button>
+          <button type="button" class="secondary" id="toggle-logs">Show logs</button>
+          <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="Show sidebar" data-hide-label="Hide sidebar">Hide sidebar</button>
+          <button type="button" class="secondary" id="refresh-button">Refresh list</button>
         </div>
       </div>
       <div class="status-row">
@@ -2151,11 +2172,104 @@
       (function initRecentBookmarkControls() {
         const recentStatus = document.getElementById('recent-status');
         const fetchRecentButton = document.getElementById('fetch-recent-button');
+        const fetchRecentLimitInput = document.getElementById('fetch-recent-limit');
         if (!recentStatus || !fetchRecentButton) {
           return;
         }
 
-        const defaultLabel = fetchRecentButton.textContent.trim() || 'Fetch latest 100';
+        const clampLimit = (value) => {
+          const numeric = Number(value);
+          if (!Number.isFinite(numeric)) {
+            return 100;
+          }
+          return Math.max(1, Math.min(500, Math.floor(numeric)));
+        };
+
+        const getSelectedLimit = () => clampLimit(fetchRecentLimitInput ? fetchRecentLimitInput.value : 100);
+        const formatButtonLabel = (limit) => `Fetch latest ${limit}`;
+
+        let idleLabel = formatButtonLabel(getSelectedLimit());
+
+        const setIdleLabel = (limit) => {
+          idleLabel = formatButtonLabel(limit);
+          if (!fetchRecentButton.disabled) {
+            fetchRecentButton.textContent = idleLabel;
+          }
+        };
+
+        const renderStatus = (lines, latestInfo) => {
+          recentStatus.replaceChildren();
+          const mergedLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
+          mergedLines.forEach((line, index) => {
+            if (index > 0) {
+              recentStatus.appendChild(document.createElement('br'));
+            }
+            const span = document.createElement('span');
+            span.textContent = line;
+            recentStatus.appendChild(span);
+          });
+
+          if (latestInfo && latestInfo.title) {
+            if (recentStatus.childNodes.length > 0) {
+              recentStatus.appendChild(document.createElement('br'));
+            }
+            const prefix = document.createElement('span');
+            prefix.textContent = 'Latest bookmark: ';
+            recentStatus.appendChild(prefix);
+
+            if (latestInfo.url) {
+              const link = document.createElement('a');
+              link.href = latestInfo.url;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              link.textContent = latestInfo.title;
+              recentStatus.appendChild(link);
+            } else {
+              const titleSpan = document.createElement('span');
+              titleSpan.textContent = latestInfo.title;
+              recentStatus.appendChild(titleSpan);
+            }
+
+            const metaPieces = [];
+            if (latestInfo.artist) {
+              metaPieces.push(latestInfo.artist);
+            }
+            if (latestInfo.bookmarked_at) {
+              metaPieces.push(String(latestInfo.bookmarked_at).replace('T', ' '));
+            }
+            if (metaPieces.length) {
+              const metaSpan = document.createElement('span');
+              metaSpan.textContent = ` (${metaPieces.join(' • ')})`;
+              recentStatus.appendChild(metaSpan);
+            }
+          }
+
+          if (!recentStatus.childNodes.length) {
+            recentStatus.textContent = 'Recent bookmark fetch is idle';
+          }
+        };
+
+        const setRunningState = (limit, processed, downloaded, skipped) => {
+          fetchRecentButton.disabled = true;
+          if (fetchRecentLimitInput) {
+            fetchRecentLimitInput.disabled = true;
+          }
+          fetchRecentButton.textContent = `Fetching latest ${limit}...`;
+          renderStatus([
+            `Fetching latest ${limit}...`,
+            `progress: processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`,
+          ]);
+        };
+
+        const applyIdleState = (limit, lines, latestInfo) => {
+          if (fetchRecentLimitInput) {
+            fetchRecentLimitInput.disabled = false;
+            fetchRecentLimitInput.value = String(limit);
+          }
+          fetchRecentButton.disabled = false;
+          setIdleLabel(limit);
+          renderStatus(lines, latestInfo);
+        };
 
         async function refreshRecentStatus() {
           try {
@@ -2168,41 +2282,42 @@
             const processed = Number(data.processed || 0);
             const downloaded = Number(data.downloaded || 0);
             const skipped = Number(data.skipped || 0);
-            const batches = Number(data.batches || 0);
-            const hasNext = Boolean(data.cursor);
             const finishedAt = data.last_finished_at ? String(data.last_finished_at).replace('T', ' ') : null;
+            const limitFromState = clampLimit(data.limit || getSelectedLimit());
+            if (fetchRecentLimitInput && !fetchRecentLimitInput.disabled) {
+              fetchRecentLimitInput.value = String(limitFromState);
+            }
 
             if (running) {
-              fetchRecentButton.disabled = true;
-              fetchRecentButton.textContent = 'Fetching...';
-              recentStatus.textContent = `Fetching latest 100... processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`;
+              setRunningState(limitFromState, processed, downloaded, skipped);
               return;
             }
 
-            let buttonLabel = batches > 0 ? 'Fetch next 100' : defaultLabel;
-            let statusMessage = 'Recent bookmark fetch is idle';
-
+            const summaryLines = [];
             if (finishedAt) {
-              statusMessage = `Last fetch: ${finishedAt} / processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`;
-            } else if (batches > 0) {
-              statusMessage = `Last result: processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`;
+              summaryLines.push(`Last fetch: ${finishedAt}`);
+            }
+            summaryLines.push(`Processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`);
+            if (data.message) {
+              summaryLines.push(data.message);
             }
 
-            if (!hasNext && batches > 0) {
-              buttonLabel = 'All caught up';
-              fetchRecentButton.disabled = true;
-            } else {
-              fetchRecentButton.disabled = false;
-            }
+            const latestInfo = {
+              title: data.latest_title,
+              url: data.latest_url,
+              artist: data.latest_artist,
+              bookmarked_at: data.latest_bookmarked_at,
+            };
 
-            fetchRecentButton.textContent = buttonLabel;
-            recentStatus.textContent = data.message ? `${statusMessage}
-${data.message}` : statusMessage;
+            applyIdleState(limitFromState, summaryLines, latestInfo);
           } catch (error) {
             console.error(error);
-            recentStatus.textContent = 'Failed to refresh recent bookmark status';
+            if (fetchRecentLimitInput) {
+              fetchRecentLimitInput.disabled = false;
+            }
             fetchRecentButton.disabled = false;
-            fetchRecentButton.textContent = defaultLabel;
+            fetchRecentButton.textContent = idleLabel;
+            recentStatus.textContent = 'Failed to refresh recent bookmark status';
           }
         }
 
@@ -2210,11 +2325,14 @@ ${data.message}` : statusMessage;
           if (fetchRecentButton.disabled) {
             return;
           }
-          fetchRecentButton.disabled = true;
-          fetchRecentButton.textContent = 'Starting...';
-          recentStatus.textContent = 'Starting recent bookmark fetch...';
+          const limitToUse = getSelectedLimit();
+          setRunningState(limitToUse, 0, 0, 0);
           try {
-            const response = await fetch('/api/recent/fetch', { method: 'POST' });
+            const response = await fetch('/api/recent/fetch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ limit: limitToUse }),
+            });
             if (!response.ok) {
               let message = 'Failed to fetch recent bookmarks';
               try {
@@ -2229,16 +2347,25 @@ ${data.message}` : statusMessage;
             }
           } catch (error) {
             console.error(error);
-            recentStatus.textContent = error.message || 'Failed to fetch recent bookmarks';
-          } finally {
-            await refreshRecentStatus();
-            fetchRecentButton.disabled = false;
-            fetchRecentButton.textContent = defaultLabel;
+            applyIdleState(getSelectedLimit(), ['Failed to fetch recent bookmarks', error.message], null);
+            return;
           }
+          await refreshRecentStatus();
         });
 
+        if (fetchRecentLimitInput) {
+          const handleLimitChange = () => {
+            const current = getSelectedLimit();
+            fetchRecentLimitInput.value = String(current);
+            setIdleLabel(current);
+          };
+          fetchRecentLimitInput.addEventListener('change', handleLimitChange);
+          fetchRecentLimitInput.addEventListener('input', handleLimitChange);
+        }
+
+        setIdleLabel(getSelectedLimit());
         refreshRecentStatus();
-        setInterval(refreshRecentStatus, 15000);
+        setInterval(refreshRecentStatus, 30000);
       })();
     </script>
 </body>
