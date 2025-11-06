@@ -8,26 +8,26 @@ from dotenv import load_dotenv
 
 
 @dataclass(frozen=True)
-class Config:
-    """Holds runtime configuration for the Pixloader service."""
+class AppConfig:
+    """Runtime configuration for the Pixloader service."""
 
     refresh_token: str | None
     download_dir: Path
-    bookmark_restrict: str = "public"
-    max_pages: int = 0
-    interval_seconds: int = 0
-    concurrency: int = 4
-    database_path: Path | None = None
-    token_file: Path | None = None
-    token_server_port: int = 8080
-    allow_password_login: bool = False
-    enable_viewer: bool = False
-    viewer_host: str = "0.0.0.0"
-    viewer_port: int = 41412
-    auto_sync_on_start: bool = True
+    database_path: Path
+    token_file: Path
+    bookmark_restrict: str
+    max_pages: int
+    interval_seconds: int
+    concurrency: int
+    token_server_port: int
+    allow_password_login: bool
+    enable_viewer: bool
+    viewer_host: str
+    viewer_port: int
+    auto_sync_on_start: bool
 
     @staticmethod
-    def load(require_token: bool = False) -> "Config":
+    def load(require_token: bool = False) -> "AppConfig":
         load_dotenv()
 
         refresh_token = os.getenv("PIXIV_REFRESH_TOKEN")
@@ -49,6 +49,7 @@ class Config:
             if db_path_env
             else download_dir / "pixloader.db"
         )
+        database_path.parent.mkdir(parents=True, exist_ok=True)
 
         token_file_env = os.getenv("PIXLOADER_TOKEN_FILE")
         token_file = Path(token_file_env).expanduser() if token_file_env else download_dir / "refresh_token.txt"
@@ -67,20 +68,20 @@ class Config:
 
         token_server_port = _int_env("PIXLOADER_TOKEN_PORT", default=8080, minimum=1, maximum=65535)
         allow_password_login = _bool_env("PIXLOADER_ALLOW_PASSWORD_LOGIN", default=False)
-        enable_viewer = _bool_env("PIXLOADER_ENABLE_VIEWER", default=False)
-        viewer_port = _int_env("PIXLOADER_VIEWER_PORT", default=41412, minimum=1, maximum=65535)
+        enable_viewer = _bool_env("PIXLOADER_ENABLE_VIEWER", default=True)
+        viewer_port = _int_env("PIXLOADER_VIEWER_PORT", default=8081, minimum=1, maximum=65535)
         viewer_host = os.getenv("PIXLOADER_VIEWER_HOST", "0.0.0.0")
         auto_sync_on_start = _bool_env("PIXLOADER_AUTO_SYNC_ON_START", default=True)
 
-        return Config(
+        return AppConfig(
             refresh_token=refresh_token,
             download_dir=download_dir,
+            database_path=database_path,
+            token_file=token_file,
             bookmark_restrict=bookmark_restrict,
             max_pages=max_pages,
             interval_seconds=interval_seconds,
             concurrency=concurrency,
-            database_path=database_path,
-            token_file=token_file,
             token_server_port=token_server_port,
             allow_password_login=allow_password_login,
             enable_viewer=enable_viewer,
@@ -102,7 +103,7 @@ def _int_env(
     else:
         try:
             value = int(raw)
-        except ValueError as exc:  # noqa: PERF203 - clarity over comprehension
+        except ValueError as exc:
             raise ValueError(f"Environment variable {name} must be an integer.") from exc
 
     if minimum is not None and value < minimum:

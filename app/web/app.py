@@ -13,10 +13,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Sequence
 
-from .logging_utils import LogBuffer
-from .config import Config
-from .maintenance import fetch_recent_batch, verify_bookmarks, verify_files
-from .sync_controller import SyncController
+from ..core.log_buffer import LogBuffer
+from ..core.config import AppConfig as Config
+from ..db.repository import DownloadRegistry
+from ..maintenance.tasks import fetch_recent_batch, verify_bookmarks, verify_files
+from ..sync.engine import SyncEngine
 
 
 LOGGER = logging.getLogger(__name__)
@@ -117,15 +118,16 @@ class Pagination:
 
 
 def create_viewer_app(
-    download_dir: Path,
-    database_path: Path,
-    sync_controller: SyncController | None = None,
+    *,
+    config: Config,
+    registry: DownloadRegistry,
+    sync_engine: SyncEngine | None = None,
     log_buffer: LogBuffer | None = None,
 ) -> Flask:
     template_dir = Path(__file__).with_name("templates")
     app = Flask(__name__, template_folder=str(template_dir))
-    download_dir = download_dir.resolve()
-    database_path = database_path.resolve()
+    download_dir = config.download_dir.resolve()
+    database_path = config.database_path.resolve()
     per_page_options = [10, 25, 50, 100, 150, 200, 300, 500]
 
 
@@ -202,12 +204,11 @@ def create_viewer_app(
             )
 
         try:
-            config = Config.load(require_token=True)
             if task_name == "files":
-                result = verify_files(config, repair=True, progress_callback=progress_callback)
+                result = verify_files(config, registry, repair=True, progress_callback=progress_callback)
                 message = None if result.failed == 0 else '一部のファイルを修復できませんでした。詳細はログを確認してください。'
             elif task_name == "bookmarks":
-                result = verify_bookmarks(config, repair=True, progress_callback=progress_callback)
+                result = verify_bookmarks(config, registry, repair=True, progress_callback=progress_callback)
                 if result.failed:
                     message = '一部のブックマーク取得で失敗しました。詳細はログを確認してください。'
                 elif result.missing:
@@ -944,23 +945,23 @@ def create_viewer_app(
 
     @app.route('/api/sync/status')
     def api_sync_status():
-        status = sync_controller.get_status() if sync_controller else None
+        status = sync_engine.get_status() if sync_engine else None
         payload = {
             'in_progress': status.in_progress if status else False,
             'last_cycle': status.last_cycle if status else 0,
             'last_started_at': status.last_started_at.isoformat() if status and status.last_started_at else None,
             'last_finished_at': status.last_finished_at.isoformat() if status and status.last_finished_at else None,
             'last_error': status.last_error if status else None,
-            'interval_seconds': sync_controller.interval if sync_controller else 0,
+            'interval_seconds': sync_engine.interval if sync_engine else 0,
             'pending_metadata': _pending_metadata_count(),
         }
         return jsonify(payload)
 
     @app.route('/api/sync/start', methods=['POST'])
     def api_sync_start():
-        if sync_controller is None:
+        if sync_engine is None:
             abort(503)
-        sync_controller.request_sync()
+        sync_engine.enqueue("manual")
         return jsonify({'ok': True})
 
     @app.route('/api/maintenance/status')
@@ -969,8 +970,8 @@ def create_viewer_app(
 
     def _start_maintenance(task_name: str) -> tuple[bool, str | None]:
         nonlocal maintenance_thread
-        if sync_controller is not None:
-            status = sync_controller.get_status()
+        if sync_engine is not None:
+            status = sync_engine.get_status()
             if status.in_progress:
                 return False, "ダウンロード処理中のため実行できません。"
         with maintenance_lock:
@@ -1015,8 +1016,8 @@ def create_viewer_app(
 
     def _start_recent_fetch(limit: int) -> tuple[bool, str | None]:
         nonlocal recent_thread
-        if sync_controller is not None:
-            status = sync_controller.get_status()
+        if sync_engine is not None:
+            status = sync_engine.get_status()
             if status.in_progress:
                 return False, "Cannot start a recent fetch while downloads are running."
         with maintenance_lock:
@@ -1053,9 +1054,9 @@ def create_viewer_app(
             def runner(previous_cursor: dict | None) -> None:
                 nonlocal recent_thread
                 try:
-                    config = Config.load(require_token=True)
                     result = fetch_recent_batch(
                         config,
+                        registry,
                         cursor_state=None,
                         limit=limit,
                         progress_callback=progress_callback,

@@ -6,6 +6,7 @@ from collections import deque
 from datetime import datetime, timezone
 from typing import Deque, Dict, List
 
+
 LOG_BUFFER_SIZE = 500
 
 
@@ -17,7 +18,7 @@ class LogBufferHandler(logging.Handler):
         self._buffer = buffer
         self._lock = threading.Lock()
 
-    def emit(self, record: logging.LogRecord) -> None:  # noqa: D401 - override
+    def emit(self, record: logging.LogRecord) -> None:
         message = self.format(record)
         payload = {
             "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
@@ -43,6 +44,6 @@ class LogBuffer:
     def snapshot(self, limit: int = 100) -> List[Dict[str, str]]:
         limit = max(1, min(limit, LOG_BUFFER_SIZE))
         with self._lock:
-            # copy from right (newest) backwards
             items = list(self._buffer)[-limit:]
         return items
+

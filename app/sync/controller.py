@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
@@ -29,7 +29,6 @@ class SyncController:
         return self._interval
 
     def request_sync(self) -> None:
-        """Trigger an immediate synchronization after the current cycle."""
         self._manual_trigger.set()
 
     def mark_cycle_start(self, cycle: int) -> None:
@@ -56,15 +55,10 @@ class SyncController:
             )
 
     def wait_for_next_cycle(self, stop_event: threading.Event) -> bool:
-        """Wait until the next scheduled cycle or a manual trigger.
-
-        Returns False if execution should stop, True to continue.
-        """
         if stop_event.is_set():
             return False
 
         if self._interval <= 0:
-            # Wait indefinitely for manual trigger.
             self._manual_trigger.wait()
             self._manual_trigger.clear()
             return not stop_event.is_set()
@@ -77,9 +71,9 @@ class SyncController:
         return not stop_event.is_set()
 
     def wait_for_manual(self, stop_event: threading.Event) -> bool:
-        """Wait solely for a manual trigger, respecting the stop event."""
         while not stop_event.is_set():
             if self._manual_trigger.wait(timeout=0.5):
                 self._manual_trigger.clear()
                 return True
         return False
+

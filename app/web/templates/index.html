@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
@@ -1042,7 +1042,7 @@
   data-default-max="{{ default_axis_max }}"
   data-rating-axes='{{ rating_axes_json|tojson }}'
 >
-    <button type="button" class="secondary sidebar-restore" id="restore-sidebar">サイドバーを表示</button>
+    <button type="button" class="secondary sidebar-restore" id="restore-sidebar">繧ｵ繧､繝峨ヰ繝ｼ繧定｡ｨ遉ｺ</button>
   <div class="viewer-shell">
     <aside class="sidebar-panel">
       <div class="sidebar-top">
@@ -1078,7 +1078,7 @@
         </div>
       </div>
       <div class="status-row">
-        <div class="status-chip" id="sync-status">Sync status is loading…</div>
+        <div class="status-chip" id="sync-status">Sync status is loading窶ｦ</div>
         <div class="status-chip" id="metadata-status" data-pending="{{ pending_metadata }}">
           {% if pending_metadata %}
             Pending metadata: {{ pending_metadata }} item(s)
@@ -1098,15 +1098,15 @@
         </div>
         <p class="maintenance-status" id="maintenance-status">Maintenance has not been run yet.</p>
         <p class="maintenance-hint">Use these tasks to verify downloads and re-fetch anything missing.</p>
-        <p class="maintenance-hint">Bookmark reconciliation and recent fetch use the Pixiv API—avoid running them too frequently.</p>
+        <p class="maintenance-hint">Bookmark reconciliation and recent fetch use the Pixiv API窶蚤void running them too frequently.</p>
       </div>
 
       <form class="filters" method="get">
         <input type="hidden" name="page" value="{{ page }}">
         <div class="toggle-row">
           <fieldset class="segmented-fieldset">
-            <legend>情報表示</legend>
-            <div class="segmented-group" role="radiogroup" aria-label="情報表示">
+            <legend>諠・ｱ陦ｨ遉ｺ</legend>
+            <div class="segmented-group" role="radiogroup" aria-label="諠・ｱ陦ｨ遉ｺ">
               {% for option in display_mode_options %}
               <label class="segmented-option">
                 <input type="radio" name="display" value="{{ option.value }}" {{ 'checked' if display_mode == option.value else '' }}>
@@ -1116,8 +1116,8 @@
             </div>
           </fieldset>
           <fieldset class="segmented-fieldset">
-            <legend>画像サイズ</legend>
-            <div class="segmented-group" role="radiogroup" aria-label="画像サイズ">
+            <legend>逕ｻ蜒上し繧､繧ｺ</legend>
+            <div class="segmented-group" role="radiogroup" aria-label="逕ｻ蜒上し繧､繧ｺ">
               {% for option in size_mode_options %}
               <label class="segmented-option">
                 <input type="radio" name="size" value="{{ option.value }}" {{ 'checked' if size_mode == option.value else '' }}>
@@ -1128,69 +1128,66 @@
           </fieldset>
         </div>
         <label>
-          並び順
-          <select name="sort">
-            <option value="downloaded_at" {{ 'selected' if sort == 'downloaded_at' else '' }}>ダウンロード日時</option>
-            <option value="posted_at" {{ 'selected' if sort == 'posted_at' else '' }}>投稿日時</option>
-            <option value="bookmarked_at" {{ 'selected' if sort == 'bookmarked_at' else '' }}>ブックマーク日時</option>
-            <option value="bookmarks" {{ 'selected' if sort == 'bookmarks' else '' }}>ブックマーク数</option>
-            <option value="views" {{ 'selected' if sort == 'views' else '' }}>閲覧数</option>
-            <option value="title" {{ 'selected' if sort == 'title' else '' }}>タイトル</option>
-            <option value="rating" {{ 'selected' if sort == 'rating' else '' }}>既定評価</option>
-            <option value="random" {{ 'selected' if sort == 'random' else '' }}>ランダム</option>
+          荳ｦ縺ｳ鬆・          <select name="sort">
+            <option value="downloaded_at" {{ 'selected' if sort == 'downloaded_at' else '' }}>繝繧ｦ繝ｳ繝ｭ繝ｼ繝画律譎・/option>
+            <option value="posted_at" {{ 'selected' if sort == 'posted_at' else '' }}>謚慕ｨｿ譌･譎・/option>
+            <option value="bookmarked_at" {{ 'selected' if sort == 'bookmarked_at' else '' }}>繝悶ャ繧ｯ繝槭・繧ｯ譌･譎・/option>
+            <option value="bookmarks" {{ 'selected' if sort == 'bookmarks' else '' }}>繝悶ャ繧ｯ繝槭・繧ｯ謨ｰ</option>
+            <option value="views" {{ 'selected' if sort == 'views' else '' }}>髢ｲ隕ｧ謨ｰ</option>
+            <option value="title" {{ 'selected' if sort == 'title' else '' }}>繧ｿ繧､繝医Ν</option>
+            <option value="rating" {{ 'selected' if sort == 'rating' else '' }}>譌｢螳夊ｩ穂ｾ｡</option>
+            <option value="random" {{ 'selected' if sort == 'random' else '' }}>繝ｩ繝ｳ繝繝</option>
             {% for axis in rating_axes %}
-            <option value="axis_{{ axis.axis_id }}" {{ 'selected' if sort == 'axis_' ~ axis.axis_id else '' }}>評価: {{ axis.name }}</option>
+            <option value="axis_{{ axis.axis_id }}" {{ 'selected' if sort == 'axis_' ~ axis.axis_id else '' }}>隧穂ｾ｡: {{ axis.name }}</option>
             {% endfor %}
         </select>
         </label>
         <label>
-          昇順 / 降順
-          <select name="order">
-            <option value="desc" {{ 'selected' if order == 'desc' else '' }}>降順</option>
-            <option value="asc" {{ 'selected' if order == 'asc' else '' }}>昇順</option>
+          譏・・/ 髯埼・          <select name="order">
+            <option value="desc" {{ 'selected' if order == 'desc' else '' }}>髯埼・/option>
+            <option value="asc" {{ 'selected' if order == 'asc' else '' }}>譏・・/option>
           </select>
         </label>
         <label>
-          タグ検索
-          <input type="text" name="tag" value="{{ tag or '' }}" placeholder="カンマ区切りで入力">
+          繧ｿ繧ｰ讀懃ｴ｢
+          <input type="text" name="tag" value="{{ tag or '' }}" placeholder="繧ｫ繝ｳ繝槫玄蛻・ｊ縺ｧ蜈･蜉・>
         </label>
         <label>
-          作者
-          <input type="text" name="artist" value="{{ artist or '' }}">
+          菴懆・          <input type="text" name="artist" value="{{ artist or '' }}">
         </label>
         <label>
-          タイトル
+          繧ｿ繧､繝医Ν
           <input type="text" name="title" value="{{ title or '' }}">
         </label>
         <label>
           R-18
           <select name="r18">
-            <option value="all" {{ 'selected' if r18 == 'all' else '' }}>すべて</option>
-            <option value="only" {{ 'selected' if r18 == 'only' else '' }}>R-18のみ</option>
-            <option value="exclude" {{ 'selected' if r18 == 'exclude' else '' }}>R-18を除外</option>
+            <option value="all" {{ 'selected' if r18 == 'all' else '' }}>縺吶∋縺ｦ</option>
+            <option value="only" {{ 'selected' if r18 == 'only' else '' }}>R-18縺ｮ縺ｿ</option>
+            <option value="exclude" {{ 'selected' if r18 == 'exclude' else '' }}>R-18繧帝勁螟・/option>
           </select>
         </label>
         <label>
-          AI作品
+          AI菴懷刀
           <select name="ai">
-            <option value="all" {{ 'selected' if ai == 'all' else '' }}>すべて</option>
-            <option value="only" {{ 'selected' if ai == 'only' else '' }}>AIのみ</option>
-            <option value="exclude" {{ 'selected' if ai == 'exclude' else '' }}>AIを除外</option>
+            <option value="all" {{ 'selected' if ai == 'all' else '' }}>縺吶∋縺ｦ</option>
+            <option value="only" {{ 'selected' if ai == 'only' else '' }}>AI縺ｮ縺ｿ</option>
+            <option value="exclude" {{ 'selected' if ai == 'exclude' else '' }}>AI繧帝勁螟・/option>
           </select>
         </label>
         <label>
-          評価軸フィルター
+          隧穂ｾ｡霆ｸ繝輔ぅ繝ｫ繧ｿ繝ｼ
           <select name="rating_axis">
-            <option value="" {{ 'selected' if rating_axis is none else '' }}>指定なし</option>
+            <option value="" {{ 'selected' if rating_axis is none else '' }}>謖・ｮ壹↑縺・/option>
             {% for axis in rating_axes %}
             <option value="{{ axis.axis_id }}" {{ 'selected' if rating_axis == axis.axis_id else '' }}>{{ axis.name }}</option>
             {% endfor %}
           </select>
         </label>
         <label>
-          評価値
+          隧穂ｾ｡蛟､
           <select name="rating_value">
-            <option value="" {{ 'selected' if rating_axis is none else '' }}>指定なし</option>
+            <option value="" {{ 'selected' if rating_axis is none else '' }}>謖・ｮ壹↑縺・/option>
             {% for value in range(0, rating_filter_max + 1) %}
             {% set selected_value = (rating_axis is not none) and (rating_value == value) %}
             <option value="{{ value }}" {{ 'selected' if selected_value else '' }}>{{ value }}</option>
@@ -1198,8 +1195,7 @@
           </select>
         </label>
         <label>
-          評価比較
-          <select name="rating_compare">
+          隧穂ｾ｡豈碑ｼ・          <select name="rating_compare">
             {% for option in rating_compare_options %}
             <option value="{{ option.value }}" {{ 'selected' if rating_compare == option.value else '' }}>{{ option.label }}</option>
             {% endfor %}
@@ -1207,30 +1203,29 @@
         </label>
         <label class="checkbox-field">
           <input type="checkbox" name="include_unknown" value="1" {{ 'checked' if include_unknown == '1' else '' }}>
-          <span>タイトル・作者未設定を表示</span>
+          <span>繧ｿ繧､繝医Ν繝ｻ菴懆・悴險ｭ螳壹ｒ陦ｨ遉ｺ</span>
         </label>
 
         <label>
-          1ページあたり
-          <select name="per_page" id="per-page-select">
+          1繝壹・繧ｸ縺ゅ◆繧・          <select name="per_page" id="per-page-select">
             {% for option in per_page_options %}
             <option value="{{ option }}" {{ 'selected' if per_page == option else '' }}>{{ option }}</option>
             {% endfor %}
           </select>
         </label>
         <div class="button-cell">
-          <button type="submit" class="secondary">検索</button>
-          <button type="button" class="secondary" id="reset-button">条件をリセット</button>
+          <button type="submit" class="secondary">讀懃ｴ｢</button>
+          <button type="button" class="secondary" id="reset-button">譚｡莉ｶ繧偵Μ繧ｻ繝・ヨ</button>
         </div>
       </form>
           </aside>
     <main class="viewer-main">
     <div class="results-summary">
-      <span>総件数: {{ pagination.total }}</span>
-      <span>ページ: {{ pagination.page }} / {{ pagination.pages }}</span>
-      <span>1ページ {{ per_page }} 件</span>
-      <span>情報表示: {{ display_label_map.get(display_mode, display_mode) }}</span>
-      <span>画像サイズ: {{ size_label_map.get(size_mode, size_mode) }}</span>
+      <span>邱丈ｻｶ謨ｰ: {{ pagination.total }}</span>
+      <span>繝壹・繧ｸ: {{ pagination.page }} / {{ pagination.pages }}</span>
+      <span>1繝壹・繧ｸ {{ per_page }} 莉ｶ</span>
+      <span>諠・ｱ陦ｨ遉ｺ: {{ display_label_map.get(display_mode, display_mode) }}</span>
+      <span>逕ｻ蜒上し繧､繧ｺ: {{ size_label_map.get(size_mode, size_mode) }}</span>
     </div>
     {% include 'gallery.html' %}
   </main>
@@ -1240,10 +1235,10 @@
   <div class="log-modal" id="log-modal">
     <div class="log-modal__dialog">
       <div class="log-modal__header">
-        <h2 class="log-modal__title">最新ログ</h2>
+        <h2 class="log-modal__title">譛譁ｰ繝ｭ繧ｰ</h2>
         <div class="log-modal__actions">
-          <button type="button" class="secondary" id="refresh-logs">最新を取得</button>
-          <button type="button" class="secondary" id="close-log-modal">閉じる</button>
+          <button type="button" class="secondary" id="refresh-logs">譛譁ｰ繧貞叙蠕・/button>
+          <button type="button" class="secondary" id="close-log-modal">髢峨§繧・/button>
         </div>
       </div>
       <div class="log-scroll">
@@ -1488,7 +1483,7 @@
       const showSidebar = () => {
         delete body.dataset.sidebar;
         if (sidebarToggle) {
-          const hideLabel = sidebarToggle.dataset.hideLabel || 'サイドバーを隠す';
+          const hideLabel = sidebarToggle.dataset.hideLabel || '繧ｵ繧､繝峨ヰ繝ｼ繧帝國縺・;
           sidebarToggle.textContent = hideLabel;
         }
       };
@@ -1496,7 +1491,7 @@
       const hideSidebar = () => {
         body.dataset.sidebar = 'hidden';
         if (sidebarToggle) {
-          const showLabel = sidebarToggle.dataset.showLabel || 'サイドバーを表示';
+          const showLabel = sidebarToggle.dataset.showLabel || '繧ｵ繧､繝峨ヰ繝ｼ繧定｡ｨ遉ｺ';
           sidebarToggle.textContent = showLabel;
         }
       };
@@ -1581,7 +1576,7 @@
             .join('');
         } catch (error) {
           console.error(error);
-          logsList.innerHTML = '<li>ログの取得に失敗しました</li>';
+          logsList.innerHTML = '<li>繝ｭ繧ｰ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆</li>';
         }
       }
 
@@ -1604,7 +1599,7 @@
           const data = await response.json();
           const running = Boolean(data.running);
           const task = typeof data.task === 'string' ? data.task : null;
-          const taskLabel = task === 'bookmarks' ? 'ブックマーク照合' : '整合性チェック';
+          const taskLabel = task === 'bookmarks' ? '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷・ : '謨ｴ蜷域ｧ繝√ぉ繝・け';
           const checked = Number(data.checked || 0);
           const missing = Number(data.missing || 0);
           const repaired = Number(data.repaired || 0);
@@ -1614,47 +1609,47 @@
             const runningThis = running && task === 'files';
             verifyFilesButton.disabled = running;
             if (runningThis) {
-              verifyFilesButton.textContent = 'チェック中…';
+              verifyFilesButton.textContent = '繝√ぉ繝・け荳ｭ窶ｦ';
             } else if (running) {
-              verifyFilesButton.textContent = '他の処理を実行中…';
+              verifyFilesButton.textContent = '莉悶・蜃ｦ逅・ｒ螳溯｡御ｸｭ窶ｦ';
             } else {
-              verifyFilesButton.textContent = '整合性チェックを実行';
+              verifyFilesButton.textContent = '謨ｴ蜷域ｧ繝√ぉ繝・け繧貞ｮ溯｡・;
             }
           }
           if (verifyBookmarksButton) {
             const runningThis = running && task === 'bookmarks';
             verifyBookmarksButton.disabled = running;
             if (runningThis) {
-              verifyBookmarksButton.textContent = 'チェック中…';
+              verifyBookmarksButton.textContent = '繝√ぉ繝・け荳ｭ窶ｦ';
             } else if (running) {
-              verifyBookmarksButton.textContent = '他の処理を実行中…';
+              verifyBookmarksButton.textContent = '莉悶・蜃ｦ逅・ｒ螳溯｡御ｸｭ窶ｦ';
             } else {
-              verifyBookmarksButton.textContent = 'ブックマーク照合を実行';
+              verifyBookmarksButton.textContent = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ螳溯｡・;
             }
           }
 
           let message;
           if (running) {
-            message = `${taskLabel}を実行中… 確認済み ${checked} 件 / 欠落 ${missing} 件 / 再取得 ${repaired} 件`;
+            message = `${taskLabel}繧貞ｮ溯｡御ｸｭ窶ｦ 遒ｺ隱肴ｸ医∩ ${checked} 莉ｶ / 谺關ｽ ${missing} 莉ｶ / 蜀榊叙蠕・${repaired} 莉ｶ`;
             if (failed) {
-              message += ` / 失敗 ${failed} 件`;
+              message += ` / 螟ｱ謨・${failed} 莉ｶ`;
             }
           } else if (data.last_finished_at) {
             const finishedAt = String(data.last_finished_at).replace('T', ' ');
-            message = `${taskLabel}の最終実行: ${finishedAt} / 確認済み ${checked} 件`;
+            message = `${taskLabel}縺ｮ譛邨ょｮ溯｡・ ${finishedAt} / 遒ｺ隱肴ｸ医∩ ${checked} 莉ｶ`;
             if (missing || repaired || failed) {
-              message += ` / 欠落 ${missing} 件 / 再取得 ${repaired} 件`;
+              message += ` / 谺關ｽ ${missing} 莉ｶ / 蜀榊叙蠕・${repaired} 莉ｶ`;
               if (failed) {
-                message += ` / 失敗 ${failed} 件`;
+                message += ` / 螟ｱ謨・${failed} 莉ｶ`;
               }
             } else {
-              message += ' / 問題は見つかりませんでした';
+              message += ' / 蝠城｡後・隕九▽縺九ｊ縺ｾ縺帙ｓ縺ｧ縺励◆';
             }
           } else if (data.last_started_at) {
             const startedAt = String(data.last_started_at).replace('T', ' ');
-            message = `${taskLabel}の前回開始: ${startedAt}`;
+            message = `${taskLabel}縺ｮ蜑榊屓髢句ｧ・ ${startedAt}`;
           } else {
-            message = `${taskLabel}はまだ実行されていません`;
+            message = `${taskLabel}縺ｯ縺ｾ縺螳溯｡後＆繧後※縺・∪縺帙ｓ`;
           }
           if (data.message) {
             message += `\n${data.message}`;
@@ -1662,14 +1657,14 @@
           maintenanceStatus.textContent = message;
         } catch (error) {
           console.error(error);
-          maintenanceStatus.textContent = 'メンテナンスステータスの取得に失敗しました';
+          maintenanceStatus.textContent = '繝｡繝ｳ繝・リ繝ｳ繧ｹ繧ｹ繝・・繧ｿ繧ｹ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆';
           if (verifyFilesButton) {
             verifyFilesButton.disabled = false;
-            verifyFilesButton.textContent = '整合性チェックを実行';
+            verifyFilesButton.textContent = '謨ｴ蜷域ｧ繝√ぉ繝・け繧貞ｮ溯｡・;
           }
           if (verifyBookmarksButton) {
             verifyBookmarksButton.disabled = false;
-            verifyBookmarksButton.textContent = 'ブックマーク照合を実行';
+            verifyBookmarksButton.textContent = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ螳溯｡・;
           }
         }
       }
@@ -1678,16 +1673,16 @@
         if (!verifyFilesButton || verifyFilesButton.disabled) {
           return;
         }
-        const originalText = verifyFilesButton.textContent || '整合性チェックを実行';
+        const originalText = verifyFilesButton.textContent || '謨ｴ蜷域ｧ繝√ぉ繝・け繧貞ｮ溯｡・;
         verifyFilesButton.disabled = true;
-        verifyFilesButton.textContent = 'チェックを開始しています…';
+        verifyFilesButton.textContent = '繝√ぉ繝・け繧帝幕蟋九＠縺ｦ縺・∪縺吮ｦ';
         if (maintenanceStatus) {
-          maintenanceStatus.textContent = '整合性チェックを開始しています…';
+          maintenanceStatus.textContent = '謨ｴ蜷域ｧ繝√ぉ繝・け繧帝幕蟋九＠縺ｦ縺・∪縺吮ｦ';
         }
         try {
           const response = await fetch('/api/maintenance/verify-files', { method: 'POST' });
           if (!response.ok) {
-            let message = '整合性チェックの開始に失敗しました';
+            let message = '謨ｴ蜷域ｧ繝√ぉ繝・け縺ｮ髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
             try {
               const data = await response.json();
               if (data && data.message) {
@@ -1703,7 +1698,7 @@
           verifyFilesButton.disabled = false;
           verifyFilesButton.textContent = originalText;
           if (maintenanceStatus) {
-            maintenanceStatus.textContent = error.message || '整合性チェックの開始に失敗しました';
+            maintenanceStatus.textContent = error.message || '謨ｴ蜷域ｧ繝√ぉ繝・け縺ｮ髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
           }
         } finally {
           await updateMaintenanceStatus();
@@ -1717,16 +1712,16 @@
         if (!verifyBookmarksButton || verifyBookmarksButton.disabled) {
           return;
         }
-        const originalText = verifyBookmarksButton.textContent || 'ブックマーク照合を実行';
+        const originalText = verifyBookmarksButton.textContent || '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ螳溯｡・;
         verifyBookmarksButton.disabled = true;
-        verifyBookmarksButton.textContent = 'チェックを開始しています…';
+        verifyBookmarksButton.textContent = '繝√ぉ繝・け繧帝幕蟋九＠縺ｦ縺・∪縺吮ｦ';
         if (maintenanceStatus) {
-          maintenanceStatus.textContent = 'ブックマーク照合を開始しています…';
+          maintenanceStatus.textContent = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ髢句ｧ九＠縺ｦ縺・∪縺吮ｦ';
         }
         try {
           const response = await fetch('/api/maintenance/verify-bookmarks', { method: 'POST' });
           if (!response.ok) {
-            let message = 'ブックマーク照合の開始に失敗しました';
+            let message = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医・髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
             try {
               const data = await response.json();
               if (data && data.message) {
@@ -1742,7 +1737,7 @@
           verifyBookmarksButton.disabled = false;
           verifyBookmarksButton.textContent = originalText;
           if (maintenanceStatus) {
-            maintenanceStatus.textContent = error.message || 'ブックマーク照合の開始に失敗しました';
+            maintenanceStatus.textContent = error.message || '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医・髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
           }
         } finally {
           await updateMaintenanceStatus();
@@ -1762,42 +1757,42 @@
           }
           const data = await response.json();
           if (data.in_progress) {
-            syncStatus.textContent = '同期を実行中です…';
+            syncStatus.textContent = '蜷梧悄繧貞ｮ溯｡御ｸｭ縺ｧ縺吮ｦ';
           } else if (data.last_finished_at) {
-            syncStatus.textContent = `最終同期: ${String(data.last_finished_at).replace('T', ' ')}`;
+            syncStatus.textContent = `譛邨ょ酔譛・ ${String(data.last_finished_at).replace('T', ' ')}`;
           } else if (data.last_started_at) {
-            syncStatus.textContent = `最後の開始: ${String(data.last_started_at).replace('T', ' ')}`;
+            syncStatus.textContent = `譛蠕後・髢句ｧ・ ${String(data.last_started_at).replace('T', ' ')}`;
           } else {
-            syncStatus.textContent = '同期待ちです';
+            syncStatus.textContent = '蜷梧悄蠕・■縺ｧ縺・;
           }
           if (metadataStatus) {
             const pending = Number(data.pending_metadata) || 0;
             metadataStatus.dataset.pending = String(pending);
             metadataStatus.textContent = pending
-              ? `不足メタデータ: 残り ${pending} 件`
-              : 'メタデータは最新です';
+              ? `荳崎ｶｳ繝｡繧ｿ繝・・繧ｿ: 谿九ｊ ${pending} 莉ｶ`
+              : '繝｡繧ｿ繝・・繧ｿ縺ｯ譛譁ｰ縺ｧ縺・;
           }
         } catch (error) {
           console.error(error);
-          syncStatus.textContent = '同期ステータスの取得に失敗しました';
+          syncStatus.textContent = '蜷梧悄繧ｹ繝・・繧ｿ繧ｹ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆';
         }
       }
 
       if (syncButton) {
-        const originalText = syncButton.textContent || '今すぐ再取得';
+        const originalText = syncButton.textContent || '莉翫☆縺仙・蜿門ｾ・;
         syncButton.addEventListener('click', async () => {
           syncButton.disabled = true;
-          syncButton.textContent = '再取得要求中…';
+          syncButton.textContent = '蜀榊叙蠕苓ｦ∵ｱゆｸｭ窶ｦ';
           try {
             const response = await fetch('/api/sync/start', { method: 'POST' });
             if (!response.ok) {
               throw new Error('failed to start sync');
             }
-            syncButton.textContent = '再取得を要求しました';
+            syncButton.textContent = '蜀榊叙蠕励ｒ隕∵ｱゅ＠縺ｾ縺励◆';
             await updateSyncStatus();
           } catch (error) {
             console.error(error);
-            syncButton.textContent = '再取得に失敗しました';
+            syncButton.textContent = '蜀榊叙蠕励↓螟ｱ謨励＠縺ｾ縺励◆';
           } finally {
             setTimeout(() => {
               syncButton.disabled = false;
@@ -1848,17 +1843,17 @@
         switch (mode) {
           case 'stars': {
             const empty = Math.max(0, max - score);
-            text = '★'.repeat(score) + '☆'.repeat(empty);
+            text = '笘・.repeat(score) + '笘・.repeat(empty);
             break;
           }
           case 'circles': {
             const empty = Math.max(0, max - score);
-            text = '●'.repeat(score) + '○'.repeat(empty);
+            text = '笳・.repeat(score) + '笳・.repeat(empty);
             break;
           }
           case 'squares': {
             const empty = Math.max(0, max - score);
-            text = '■'.repeat(score) + '□'.repeat(empty);
+            text = '笆'.repeat(score) + '笆｡'.repeat(empty);
             break;
           }
           case 'bar':
@@ -1977,7 +1972,7 @@
         };
 
         if (statusLabel) {
-          statusLabel.textContent = '保存中…';
+          statusLabel.textContent = '菫晏ｭ倅ｸｭ窶ｦ';
         }
 
         try {
@@ -1992,9 +1987,9 @@
           const result = await response.json();
           updateCardAfterSave(illustId, result);
           if (statusLabel) {
-            statusLabel.textContent = '保存しました';
+            statusLabel.textContent = '菫晏ｭ倥＠縺ｾ縺励◆';
             setTimeout(() => {
-              if (statusLabel.textContent === '保存しました') {
+              if (statusLabel.textContent === '菫晏ｭ倥＠縺ｾ縺励◆') {
                 statusLabel.textContent = '';
               }
             }, 2500);
@@ -2016,9 +2011,9 @@
             updateInlineAxisSelects(editor, axisId, previousScore);
           }
           if (statusLabel) {
-            statusLabel.textContent = '保存に失敗しました';
+            statusLabel.textContent = '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆';
             setTimeout(() => {
-              if (statusLabel.textContent === '保存に失敗しました') {
+              if (statusLabel.textContent === '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆') {
                 statusLabel.textContent = '';
               }
             }, 4000);
@@ -2159,7 +2154,7 @@
         }
         if (total > threshold) {
           expandButton.hidden = false;
-          expandButton.textContent = expanded ? 'タグを折りたたむ' : 'タグをすべて表示';
+          expandButton.textContent = expanded ? '繧ｿ繧ｰ繧呈釜繧翫◆縺溘・' : '繧ｿ繧ｰ繧偵☆縺ｹ縺ｦ陦ｨ遉ｺ';
         } else {
           expandButton.hidden = true;
           container.dataset.expanded = 'true';
@@ -2305,8 +2300,8 @@
           const saveButton = editor.querySelector('.inline-save');
           const statusLabel = editor.querySelector('.inline-status');
           const tagsInput = editor.querySelector('.inline-tags-input');
-          const collapsedLabel = toggleButton?.dataset.collapsedLabel || 'クイック編集';
-          const expandedLabel = toggleButton?.dataset.expandedLabel || '閉じる';
+          const collapsedLabel = toggleButton?.dataset.collapsedLabel || '繧ｯ繧､繝・け邱ｨ髮・;
+          const expandedLabel = toggleButton?.dataset.expandedLabel || '髢峨§繧・;
 
           if (tagsInput && editor.dataset.customTags && !tagsInput.dataset.initialized) {
             tagsInput.value = editor.dataset.customTags;
@@ -2367,7 +2362,7 @@
                   .filter(Boolean)
               : [];
             if (statusLabel) {
-              statusLabel.textContent = '保存中…';
+              statusLabel.textContent = '菫晏ｭ倅ｸｭ窶ｦ';
             }
             try {
               const response = await fetch(`/api/illust/${illustId}/meta`, {
@@ -2381,7 +2376,7 @@
               const result = await response.json();
               updateCardAfterSave(illustId, result);
               if (statusLabel) {
-                statusLabel.textContent = '保存しました';
+                statusLabel.textContent = '菫晏ｭ倥＠縺ｾ縺励◆';
                 setTimeout(() => {
                   statusLabel.textContent = '';
                 }, 2500);
@@ -2390,7 +2385,7 @@
             } catch (error) {
               console.error(error);
               if (statusLabel) {
-                statusLabel.textContent = '保存に失敗しました';
+                statusLabel.textContent = '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆';
               }
             }
           });
@@ -2471,7 +2466,7 @@
             }
             if (metaPieces.length) {
               const metaSpan = document.createElement('span');
-              metaSpan.textContent = ` (${metaPieces.join(' • ')})`;
+              metaSpan.textContent = ` (${metaPieces.join(' 窶｢ ')})`;
               recentStatus.appendChild(metaSpan);
             }
           }

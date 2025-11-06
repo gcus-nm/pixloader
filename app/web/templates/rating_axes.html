@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>評価軸の管理 - Pixloader Viewer</title>
+  <title>隧穂ｾ｡霆ｸ縺ｮ邂｡逅・- Pixloader Viewer</title>
   <style>
     :root {
       color-scheme: dark;
@@ -137,11 +137,10 @@
 </head>
 <body>
   <header>
-    <a href="{{ url_for('index') }}">&larr; 一覧に戻る</a>
-    <h1>評価軸の管理</h1>
+    <a href="{{ url_for('index') }}">&larr; 荳隕ｧ縺ｫ謌ｻ繧・/a>
+    <h1>隧穂ｾ｡霆ｸ縺ｮ邂｡逅・/h1>
     <p style="margin:0;color:rgba(235,240,255,0.7);font-size:0.95rem;">
-      カスタム評価軸を追加・更新して、ギャラリーや詳細画面での採点方法を柔軟に切り替えられます。
-    </p>
+      繧ｫ繧ｹ繧ｿ繝隧穂ｾ｡霆ｸ繧定ｿｽ蜉繝ｻ譖ｴ譁ｰ縺励※縲√ぐ繝｣繝ｩ繝ｪ繝ｼ繧・ｩｳ邏ｰ逕ｻ髱｢縺ｧ縺ｮ謗｡轤ｹ譁ｹ豕輔ｒ譟碑ｻ溘↓蛻・ｊ譖ｿ縺医ｉ繧後∪縺吶・    </p>
   </header>
   <main>
     {% if message %}
@@ -154,38 +153,36 @@
     <form method="post" class="axis-create">
       <input type="hidden" name="action" value="create">
       <label>
-        評価軸名
-        <input type="text" name="name" placeholder="例: キャラクター、総合" required>
+        隧穂ｾ｡霆ｸ蜷・        <input type="text" name="name" placeholder="萓・ 繧ｭ繝｣繝ｩ繧ｯ繧ｿ繝ｼ縲∫ｷ丞粋" required>
       </label>
       <label>
-        最大スコア
+        譛螟ｧ繧ｹ繧ｳ繧｢
         <input type="number" name="max_score" min="1" value="5" required>
       </label>
       <label>
-        表示方法
-        <select name="display_mode">
+        陦ｨ遉ｺ譁ｹ豕・        <select name="display_mode">
           {% for mode in display_modes %}
           <option value="{{ mode }}">{{ {
-            'stars': '星 (★)',
-            'circles': '丸 (●)',
-            'squares': '四角 (■)',
-            'numeric': '数値表示',
-            'bar': 'ゲージ'
+            'stars': '譏・(笘・',
+            'circles': '荳ｸ (笳・',
+            'squares': '蝗幄ｧ・(笆)',
+            'numeric': '謨ｰ蛟､陦ｨ遉ｺ',
+            'bar': '繧ｲ繝ｼ繧ｸ'
           }[mode] }}</option>
           {% endfor %}
         </select>
       </label>
-      <button type="submit">追加</button>
+      <button type="submit">霑ｽ蜉</button>
     </form>
 
     <table>
       <thead>
         <tr>
-          <th style="width:30%">名称</th>
-          <th style="width:18%">最大スコア</th>
-          <th style="width:20%">表示方法</th>
-          <th style="width:14%">既定</th>
-          <th style="width:18%">操作</th>
+          <th style="width:30%">蜷咲ｧｰ</th>
+          <th style="width:18%">譛螟ｧ繧ｹ繧ｳ繧｢</th>
+          <th style="width:20%">陦ｨ遉ｺ譁ｹ豕・/th>
+          <th style="width:14%">譌｢螳・/th>
+          <th style="width:18%">謫堺ｽ・/th>
         </tr>
       </thead>
             <tbody>
@@ -204,23 +201,23 @@
             <select form="{{ form_id }}" name="display_mode">
               {% for mode in display_modes %}
               <option value="{{ mode }}" {{ 'selected' if axis.display_mode == mode else '' }}>{{ {
-                'stars': '星 (★)',
-                'circles': '丸 (●)',
-                'squares': '四角 (■)',
-                'numeric': '数値表示',
-                'bar': 'ゲージ'
+                'stars': '譏・(笘・',
+                'circles': '荳ｸ (笳・',
+                'squares': '蝗幄ｧ・(笆)',
+                'numeric': '謨ｰ蛟､陦ｨ遉ｺ',
+                'bar': '繧ｲ繝ｼ繧ｸ'
               }[mode] }}</option>
               {% endfor %}
             </select>
           </td>
-          <td>{% if axis.is_default %}<span class="badge">既定</span>{% else %}--{% endif %}</td>
+          <td>{% if axis.is_default %}<span class="badge">譌｢螳・/span>{% else %}--{% endif %}</td>
           <td>
             <div class="actions">
-              <button type="submit" form="{{ form_id }}" class="secondary">更新</button>
+              <button type="submit" form="{{ form_id }}" class="secondary">譖ｴ譁ｰ</button>
               {% if not axis.is_default %}
-              <a class="danger-link" href="{{ url_for('manage_rating_axes', delete=axis.axis_id) }}" onclick="return confirm('本当に削除しますか？');">削除</a>
+              <a class="danger-link" href="{{ url_for('manage_rating_axes', delete=axis.axis_id) }}" onclick="return confirm('譛ｬ蠖薙↓蜑企勁縺励∪縺吶°・・);">蜑企勁</a>
               {% else %}
-              <span style="color:rgba(235,240,255,0.6);">保存済み</span>
+              <span style="color:rgba(235,240,255,0.6);">菫晏ｭ俶ｸ医∩</span>
               {% endif %}
             </div>
           </td>

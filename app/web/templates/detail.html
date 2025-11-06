@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ illust.title or "イラスト詳細" }} - Pixloader Viewer</title>
+  <title>{{ illust.title or "繧､繝ｩ繧ｹ繝郁ｩｳ邏ｰ" }} - Pixloader Viewer</title>
   <style>
     :root {
       color-scheme: dark;
@@ -312,20 +312,20 @@ main {
 </head>
 <body>
   <header>
-    <a class="back-link" href="{{ build_url('index', page=((request.args.get('page')|default(1))|int)) }}">&larr; 一覧へ戻る</a>
-    <h1>{{ illust.title or "タイトル未設定" }}</h1>
+    <a class="back-link" href="{{ build_url('index', page=((request.args.get('page')|default(1))|int)) }}">&larr; 荳隕ｧ縺ｸ謌ｻ繧・/a>
+    <h1>{{ illust.title or "繧ｿ繧､繝医Ν譛ｪ險ｭ螳・ }}</h1>
     <div class="meta">
-      <span>作者: {{ illust.artist or "不明" }}</span>
+      <span>菴懆・ {{ illust.artist or "荳肴・" }}</span>
       <span>ID: {{ illust.illust_id }}</span>
-      <span>最終取得: {{ illust.last_downloaded_at or "----" }}</span>
-      <span>ブクマ: {{ illust.bookmark_count }}</span>
-      <span>閲覧: {{ illust.view_count }}</span>
-      <a href="https://www.pixiv.net/artworks/{{ illust.illust_id }}" target="_blank" rel="noopener">Pixivで表示</a>
+      <span>譛邨ょ叙蠕・ {{ illust.last_downloaded_at or "----" }}</span>
+      <span>繝悶け繝・ {{ illust.bookmark_count }}</span>
+      <span>髢ｲ隕ｧ: {{ illust.view_count }}</span>
+      <a href="https://www.pixiv.net/artworks/{{ illust.illust_id }}" target="_blank" rel="noopener">Pixiv縺ｧ陦ｨ遉ｺ</a>
     </div>
     <div class="chips">
       {% if illust.is_r18 %}<span class="chip r18">R-18</span>{% endif %}
       {% if illust.is_ai %}<span class="chip ai">AI</span>{% endif %}
-      <span class="chip">ページ数 {{ images|length }}</span>
+      <span class="chip">繝壹・繧ｸ謨ｰ {{ images|length }}</span>
     </div>
     {% if axes_with_scores %}
     <div class="detail-rating-chips">
@@ -344,18 +344,18 @@ main {
     {% endif %}
     {% if pending_metadata %}
     <div style="font-size:0.85rem;color:rgba(255,220,180,0.85);">
-      メタデータ処理待ち: 残り {{ pending_metadata }} 件
+      繝｡繧ｿ繝・・繧ｿ蜃ｦ逅・ｾ・■: 谿九ｊ {{ pending_metadata }} 莉ｶ
     </div>
     {% endif %}
   </header>
   <main>
     <section class="panel">
-      <h2>評価とタグ</h2>
+      <h2>隧穂ｾ｡縺ｨ繧ｿ繧ｰ</h2>
       <div id="axis-container">
         {% for axis in axes_with_scores %}
         <div class="axis" data-axis-id="{{ axis.axis_id }}" data-max="{{ axis.max_score }}">
           <div class="axis-head">
-            <strong>{{ axis.name }}{% if axis.is_default %} (既定){% endif %}</strong>
+            <strong>{{ axis.name }}{% if axis.is_default %} (譌｢螳・{% endif %}</strong>
             <span><span class="axis-score">{{ axis.score }}</span> / {{ axis.max_score }}</span>
           </div>
           <div class="axis-controls">
@@ -364,24 +364,23 @@ main {
               <option value="{{ value }}" {{ 'selected' if axis.score == value else '' }}>{{ value }}</option>
               {% endfor %}
             </select>
-            <button type="button" class="axis-clear">クリア</button>
+            <button type="button" class="axis-clear">繧ｯ繝ｪ繧｢</button>
           </div>
         </div>
         {% endfor %}
       </div>
       <div class="tag-editor">
         <label>
-          独自タグ（カンマ区切り）
-          <input type="text" id="custom-tags" value="{{ illust.custom_tags|join(', ') }}">
+          迢ｬ閾ｪ繧ｿ繧ｰ・医き繝ｳ繝槫玄蛻・ｊ・・          <input type="text" id="custom-tags" value="{{ illust.custom_tags|join(', ') }}">
         </label>
       </div>
       <div class="actions">
-        <button type="button" id="save-button">保存</button>
+        <button type="button" id="save-button">菫晏ｭ・/button>
         <span class="status" id="save-status"></span>
       </div>
     </section>
     <section class="panel">
-      <h2>画像</h2>
+      <h2>逕ｻ蜒・/h2>
       <div class="gallery">
         {% for image in images %}
         <figure>
@@ -398,7 +397,7 @@ main {
             <img src="{{ url_for('serve_file', path=image.path) }}" alt="{{ image.filename }}">
           </a>
           <figcaption>
-            <span>ページ {{ image.page + 1 }}</span>
+            <span>繝壹・繧ｸ {{ image.page + 1 }}</span>
             <span>{{ image.filename }}</span>
           </figcaption>
         </figure>
@@ -408,15 +407,15 @@ main {
   </main>
   <div id="lightbox" hidden aria-hidden="true">
     <div class="lightbox-shell">
-      <button type="button" class="lightbox-close" data-close="true" aria-label="閉じる">×</button>
+      <button type="button" class="lightbox-close" data-close="true" aria-label="髢峨§繧・>ﾃ・/button>
       <div class="lightbox-stage">
-        <button type="button" class="lightbox-hit left" data-direction="-1" aria-label="前の画像"></button>
+        <button type="button" class="lightbox-hit left" data-direction="-1" aria-label="蜑阪・逕ｻ蜒・></button>
         <img id="lightbox-image" src="" alt="">
-        <button type="button" class="lightbox-hit right" data-direction="1" aria-label="次の画像"></button>
+        <button type="button" class="lightbox-hit right" data-direction="1" aria-label="谺｡縺ｮ逕ｻ蜒・></button>
       </div>
       <div class="lightbox-caption">
         <span id="lightbox-page"></span>
-        <a id="lightbox-open-original" href="#" target="_blank" rel="noopener">原寸で開く</a>
+        <a id="lightbox-open-original" href="#" target="_blank" rel="noopener">蜴溷ｯｸ縺ｧ髢九￥</a>
         <span id="lightbox-filename"></span>
       </div>
     </div>
@@ -492,7 +491,7 @@ main {
       }
 
       document.getElementById("save-button")?.addEventListener("click", () => {
-        setStatus("保存中…", true);
+        setStatus("菫晏ｭ倅ｸｭ窶ｦ", true);
         fetch(`/api/illust/${illustId}/meta`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -504,11 +503,11 @@ main {
           })
           .then((data) => {
             applyResponse(data);
-            setStatus("保存しました", true);
+            setStatus("菫晏ｭ倥＠縺ｾ縺励◆", true);
           })
           .catch((err) => {
             console.error(err);
-            setStatus("保存に失敗しました", false);
+            setStatus("菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆", false);
           });
       });
 
@@ -532,10 +531,10 @@ main {
           const pageNumber = Number(link.dataset.page || index + 1);
           if (lightboxImage) {
             lightboxImage.src = src;
-            lightboxImage.alt = filename || `ページ ${pageNumber}`;
+            lightboxImage.alt = filename || `繝壹・繧ｸ ${pageNumber}`;
           }
           if (lightboxPage) {
-            lightboxPage.textContent = `ページ ${pageNumber} / ${total}`;
+            lightboxPage.textContent = `繝壹・繧ｸ ${pageNumber} / ${total}`;
           }
           if (lightboxFilename) {
             lightboxFilename.textContent = filename;

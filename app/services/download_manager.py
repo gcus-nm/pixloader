@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from .pixiv_service import ImageTask, PixivBookmarkService
-from .storage import DownloadRegistry
+from ..db.repository import DownloadRegistry
+from ..pixiv.service import ImageTask, PixivBookmarkService
 
 LOGGER = logging.getLogger(__name__)
 
@@ -86,9 +86,9 @@ class DownloadManager:
             self._registry.record_download(
                 result.task.illust_id,
                 result.task.page_index,
-                str(result.path),
-                result.task.title,
-                result.task.artist_name,
+                result.path,
+                illust_title=result.task.title,
+                artist_name=result.task.artist_name,
                 tags=result.task.tags,
                 bookmark_count=result.task.bookmark_count,
                 view_count=result.task.view_count,
@@ -123,3 +123,4 @@ class DownloadManager:
             return None
 
         return DownloadResult(task=task, path=target_path)
+

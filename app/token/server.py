@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import logging
@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
 
-from .pixiv_auth_flow import (
+from .flow import (
     AuthTokens,
     OAuthSession,
     PixivAuthError,
@@ -22,11 +22,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang=\"ja\">
+<html lang="ja">
   <head>
-    <meta charset=\"utf-8\">
+    <meta charset="utf-8">
     <title>Pixloader Pixiv Login</title>
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
       :root {
         color-scheme: dark;
@@ -153,32 +153,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </head>
   <body>
     <main>
-      <h1>Pixiv 認証</h1>
-      <p class=\"lead\">Pixiv アカウントでログインし、生成されたリフレッシュトークンを Pixloader に保存します。</p>
+      <h1>Pixiv ログイン</h1>
+      <p class="lead">Pixiv アカウントでログインし、取得されたリフレッシュトークンを Pixloader に登録します。</p>
 
-      <a id=\"loginLink\" class=\"button\" href=\"#\" target=\"_blank\" rel=\"noopener\">Pixivでログイン</a>
+      <a id="loginLink" class="button" href="#" target="_blank" rel="noopener">Pixivでログイン</a>
 
-      <section class=\"card\" id=\"inputCard\">
-        <label for=\"codeInput\">コールバックURLまたは認証コード</label>
-        <textarea id=\"codeInput\" rows=\"3\" placeholder=\"https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback?...\"></textarea>
-        <div class=\"actions\">
-          <button type=\"button\" class=\"primary\" id=\"submitButton\">トークン取得</button>
-          <button type=\"button\" id=\"pasteButton\">クリップボードから貼り付け</button>
-          <button type=\"button\" class=\"ghost\" id=\"resetButton\">新しいログインセッション</button>
+      <section class="card" id="inputCard">
+        <label for="codeInput">コールバックURLまたは認証コード</label>
+        <textarea id="codeInput" rows="3" placeholder="https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback?..."></textarea>
+        <div class="actions">
+          <button type="button" class="primary" id="submitButton">トークン取得</button>
+          <button type="button" id="pasteButton">クリップボードから貼り付け</button>
+          <button type="button" class="ghost" id="resetButton">新しいログインセッション</button>
         </div>
-        <p class=\"meta\">※ 認証後に表示されたページの URL をコピーし、このフォームに貼り付けてください。</p>
+        <p class="meta">※ 認証後に表示されたページの URL を貼り付けると自動的にコードが抽出されます。</p>
       </section>
 
-      <div id=\"errorBox\" class=\"alert\" hidden></div>
+      <div id="errorBox" class="alert" hidden></div>
 
-      <section class=\"card success\" id=\"tokensCard\" hidden>
+      <section class="card success" id="tokensCard" hidden>
         <h2>取得したトークン</h2>
-        <p>以下の値を安全な場所にコピーしてください。Pixloader は自動的にリフレッシュトークンを保存します。</p>
+        <p>以下の値が安全に保存されました。必要に応じてアクセス・リフレッシュトークンをコピーしてください。</p>
         <label>Refresh Token</label>
-        <textarea id=\"refreshOutput\" rows=\"3\" readonly></textarea>
+        <textarea id="refreshOutput" rows="3" readonly></textarea>
         <label>Access Token</label>
-        <textarea id=\"accessOutput\" rows=\"3\" readonly></textarea>
-        <p class=\"meta\">expires_in: <span id=\"expiresOutput\"></span> 秒</p>
+        <textarea id="accessOutput" rows="3" readonly></textarea>
+        <p class="meta">expires_in: <span id="expiresOutput"></span> 秒</p>
       </section>
     </main>
 
@@ -198,107 +198,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       async function fetchState() {
         const response = await fetch('/state', { cache: 'no-store' });
         if (!response.ok) {
-          throw new Error('failed to load state');
+          throw new Error('state fetch failed');
         }
         return response.json();
       }
 
-      function renderState(data) {
-        if (data.login_url) {
-          loginLink.href = data.login_url;
-        }
-        if (data.error) {
-          errorBox.textContent = data.error;
-          errorBox.hidden = false;
-        } else {
-          errorBox.hidden = true;
-        }
-        if (data.tokens) {
-          refreshOutput.value = data.tokens.refresh_token;
-          accessOutput.value = data.tokens.access_token;
-          expiresOutput.textContent = data.tokens.expires_in ?? 0;
-          tokensCard.hidden = false;
-          tokensCard.dataset.hasTokens = '1';
-        } else {
-          tokensCard.hidden = true;
-          delete tokensCard.dataset.hasTokens;
-        }
-      }
-
-      async function refreshUI() {
+      async function refreshState() {
         try {
-          const data = await fetchState();
-          renderState(data);
+          const state = await fetchState();
+          loginLink.href = state.session.login_url;
+          if (state.tokens) {
+            tokensCard.hidden = false;
+            refreshOutput.value = state.tokens.refresh_token;
+            accessOutput.value = state.tokens.access_token;
+            expiresOutput.textContent = state.tokens.expires_in;
+          }
+          if (state.error) {
+            errorBox.hidden = false;
+            errorBox.textContent = state.error;
+          } else {
+            errorBox.hidden = true;
+            errorBox.textContent = '';
+          }
         } catch (err) {
           console.error(err);
-          errorBox.textContent = '状態の取得に失敗しました。ページをリロードしてください。';
-          errorBox.hidden = false;
         }
       }
 
-      async function submitCode(rawValue) {
-        const payload = { code: rawValue.trim() };
-        if (!payload.code) {
-          return;
-        }
+      submitButton.addEventListener('click', async () => {
+        const payload = { code: codeInput.value };
         const response = await fetch('/exchange', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          errorBox.textContent = result.error || 'トークンの取得に失敗しました。';
-          errorBox.hidden = false;
-        } else {
-          renderState(result);
-          errorBox.hidden = true;
+        if (response.ok) {
+          codeInput.value = '';
         }
-      }
-
-      submitButton.addEventListener('click', () => {
-        submitCode(codeInput.value);
-      });
-
-      codeInput.addEventListener('input', () => {
-        const value = codeInput.value.trim();
-        if (value.includes('code=')) {
-          submitCode(value);
-        }
+        await refreshState();
       });
 
       pasteButton.addEventListener('click', async () => {
-        if (!navigator.clipboard) {
-          errorBox.textContent = 'クリップボード API が利用できません。手動で貼り付けてください。';
-          errorBox.hidden = false;
-          return;
-        }
         try {
           const text = await navigator.clipboard.readText();
-          if (text) {
-            codeInput.value = text.trim();
-            submitCode(codeInput.value);
-          }
+          codeInput.value = text;
         } catch (err) {
-          errorBox.textContent = 'クリップボードの読み取りに失敗しました。ブラウザの許可設定をご確認ください。';
-          errorBox.hidden = false;
+          console.error(err);
         }
       });
 
       resetButton.addEventListener('click', async () => {
         await fetch('/reset', { method: 'POST' });
-        codeInput.value = '';
-        await refreshUI();
+        await refreshState();
       });
 
-      window.addEventListener('focus', () => {
-        if (!tokensCard.dataset.hasTokens && codeInput.value.includes('code=')) {
-          submitCode(codeInput.value);
-        }
-      });
-
-      refreshUI();
-    })();
+      refreshState();
+    }());
     </script>
   </body>
 </html>
@@ -306,30 +261,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 
 @dataclass
-class AuthFlowState:
+class TokenServerState:
     session: OAuthSession
-    tokens: Optional[AuthTokens] = None
-    error: Optional[str] = None
+    tokens: AuthTokens | None = None
+    error: str | None = None
 
-    def to_payload(self) -> dict[str, object]:
+    def to_payload(self) -> dict:
         return {
-            "login_url": self.session.login_url,
+            "session": {
+                "login_url": self.session.login_url,
+            },
             "tokens": self.tokens.to_dict() if self.tokens else None,
             "error": self.error,
         }
 
 
 class TokenHTTPServer(ThreadingHTTPServer):
-    allow_reuse_address = True
-
-    def __init__(self, server_address, token_file: Path, event: threading.Event) -> None:
-        super().__init__(server_address, TokenRequestHandler)
+    def __init__(self, address: tuple[str, int], token_file: Path, event: threading.Event) -> None:
+        self.state = TokenServerState(session=start_oauth_session())
         self.token_file = token_file
         self.token_event = event
-        self.state = AuthFlowState(session=start_oauth_session())
+        super().__init__(address, TokenRequestHandler)
 
     def reset_flow(self) -> None:
-        self.state = AuthFlowState(session=start_oauth_session())
+        self.state = TokenServerState(session=start_oauth_session())
 
     def record_tokens(self, tokens: AuthTokens) -> None:
         self.state.tokens = tokens
@@ -438,7 +393,10 @@ class TokenInputServer:
 
         self._thread = threading.Thread(target=self._server.serve_forever, name="TokenServer", daemon=True)
         self._thread.start()
-        LOGGER.info("Waiting for Pixiv refresh token. Open http://localhost:%s/ in your browser to complete setup.", self._port)
+        LOGGER.info(
+            "Waiting for Pixiv refresh token. Open http://localhost:%s/ in your browser to complete setup.",
+            self._port,
+        )
 
         try:
             while not stop_event.is_set():
@@ -459,3 +417,4 @@ class TokenInputServer:
             return token or None
 
         return None
+

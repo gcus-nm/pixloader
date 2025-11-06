@@ -1,11 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from dataclasses import dataclass
 from base64 import urlsafe_b64encode
+from dataclasses import dataclass
 from hashlib import sha256
 from secrets import token_urlsafe
 from typing import Any, Dict
-from urllib.parse import urlencode, urlparse, parse_qs
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import requests
 
@@ -149,3 +149,4 @@ def parse_code_from_input(raw_value: str) -> str:
         if code_values:
             return code_values[0]
     return raw_value
+
