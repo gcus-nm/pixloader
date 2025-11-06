@@ -1,17 +1,25 @@
 ﻿from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 import sqlite3
+import threading
+from http import HTTPStatus
 import unicodedata
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Sequence
 
 from .logging_utils import LogBuffer
+from .config import Config
+from .maintenance import verify_files
 from .sync_controller import SyncController
 
+
+LOGGER = logging.getLogger(__name__)
 
 from flask import (
     Flask,
@@ -139,6 +147,77 @@ def create_viewer_app(
         {"value": "le", "label": "以下 (≦)"},
     ]
     rating_display_modes = {"stars", "circles", "squares", "numeric", "bar"}
+
+    maintenance_lock = threading.Lock()
+    maintenance_state = {
+        "running": False,
+        "last_started_at": None,
+        "last_finished_at": None,
+        "checked": 0,
+        "missing": 0,
+        "repaired": 0,
+        "failed": 0,
+        "message": None,
+        "task": None,
+    }
+    maintenance_thread: threading.Thread | None = None
+
+    def _update_maintenance(**kwargs) -> None:
+        with maintenance_lock:
+            maintenance_state.update(kwargs)
+
+    def _maintenance_snapshot() -> dict[str, object]:
+        with maintenance_lock:
+            return dict(maintenance_state)
+
+    def _run_maintenance_task(task_name: str) -> None:
+        nonlocal maintenance_thread
+
+        def progress_callback(checked: int, missing: int, repaired: int, failed: int) -> None:
+            _update_maintenance(
+                checked=checked,
+                missing=missing,
+                repaired=repaired,
+                failed=failed,
+                task=task_name,
+            )
+
+        try:
+            config = Config.load(require_token=True)
+            if task_name == "files":
+                result = verify_files(config, repair=True, progress_callback=progress_callback)
+                message = None if result.failed == 0 else '????t?@?C?????C???????????????B??????O???m?F????????????B'
+            elif task_name == "bookmarks":
+                result = verify_bookmarks(config, repair=True, progress_callback=progress_callback)
+                if result.failed:
+                    message = '???????u?b?N?}?[?N???????s????????B????????O???m?F????????????B'
+                elif result.missing:
+                    message = '?????u?b?N?}?[?N??????????????????????B'
+                else:
+                    message = '???????u?b?N?}?[?N???S???????????????B'
+            else:
+                raise ValueError(f"Unknown maintenance task: {task_name}")
+            _update_maintenance(
+                running=False,
+                last_finished_at=datetime.utcnow().isoformat(),
+                checked=result.checked,
+                missing=result.missing,
+                repaired=result.repaired,
+                failed=result.failed,
+                message=message,
+                task=task_name,
+            )
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error('Maintenance task %s failed: %s', task_name, exc, exc_info=True)
+            _update_maintenance(
+                running=False,
+                last_finished_at=datetime.utcnow().isoformat(),
+                message=str(exc),
+                task=task_name,
+            )
+        finally:
+            with maintenance_lock:
+                maintenance_thread = None
 
     def _connect() -> sqlite3.Connection:
         conn = sqlite3.connect(database_path, timeout=10, check_same_thread=False)
@@ -863,6 +942,47 @@ def create_viewer_app(
         if sync_controller is None:
             abort(503)
         sync_controller.request_sync()
+        return jsonify({'ok': True})
+
+    @app.route('/api/maintenance/status')
+    def api_maintenance_status():
+        return jsonify(_maintenance_snapshot())
+
+    def _start_maintenance(task_name: str) -> tuple[bool, str | None]:
+        nonlocal maintenance_thread
+        if sync_controller is not None:
+            status = sync_controller.get_status()
+            if status.in_progress:
+                return False, '??????????s????????B'
+        with maintenance_lock:
+            if maintenance_state['running']:
+                return False, '???????`?F?b?N??i?s??????B'
+            _update_maintenance(
+                running=True,
+                last_started_at=datetime.utcnow().isoformat(),
+                message=None,
+                checked=0,
+                missing=0,
+                repaired=0,
+                failed=0,
+                task=task_name,
+            )
+            maintenance_thread = threading.Thread(target=lambda: _run_maintenance_task(task_name), daemon=True)
+            maintenance_thread.start()
+        return True, None
+
+    @app.route('/api/maintenance/verify-files', methods=['POST'])
+    def api_maintenance_verify_files():
+        ok, message = _start_maintenance('files')
+        if not ok:
+            return jsonify({'ok': False, 'message': message}), HTTPStatus.CONFLICT
+        return jsonify({'ok': True})
+
+    @app.route('/api/maintenance/verify-bookmarks', methods=['POST'])
+    def api_maintenance_verify_bookmarks():
+        ok, message = _start_maintenance('bookmarks')
+        if not ok:
+            return jsonify({'ok': False, 'message': message}), HTTPStatus.CONFLICT
         return jsonify({'ok': True})
 
     @app.route('/api/logs')

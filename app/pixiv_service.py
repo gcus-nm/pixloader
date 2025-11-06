@@ -61,6 +61,12 @@ class PixivBookmarkService:
 
     def __init__(self, refresh_token: str, restrict: str = "public", max_pages: int = 0) -> None:
         self._refresh_token = refresh_token
+        if restrict == "both":
+            self._restrict_modes = ("public", "private")
+        elif restrict in ("public", "private"):
+            self._restrict_modes = (restrict,)
+        else:
+            raise ValueError("restrict must be 'public', 'private', or 'both'")
         self._restrict = restrict
         self._max_pages = max_pages
 
@@ -92,29 +98,42 @@ class PixivBookmarkService:
         if self._user_id is None:
             raise RuntimeError("PixivBookmarkService.authenticate() must be called before iterating.")
 
+        seen: set[int] = set()
+        for restrict_mode in self._restrict_modes:
+            yield from self._iter_bookmarks_for_mode(restrict_mode, seen)
+
+    def _iter_bookmarks_for_mode(self, restrict_mode: str, seen: set[int]) -> Iterator[Dict]:
         page = 0
         max_bookmark_id: int | str | None = None
+        offset: int | None = None
         while True:
             json_result: Dict | None = None
             for attempt in range(3):
                 try:
+                    params: Dict[str, int | str] = {}
+                    if max_bookmark_id not in {None, "", 0, "0"}:
+                        params["max_bookmark_id"] = max_bookmark_id  # type: ignore[assignment]
+                    if offset is not None and offset >= 0:
+                        params["offset"] = offset  # type: ignore[assignment]
                     json_result = self._api.user_bookmarks_illust(
                         self._user_id,
-                        restrict=self._restrict,
-                        max_bookmark_id=max_bookmark_id,
+                        restrict=restrict_mode,
+                        **params,
                     )
                     break
                 except Exception as exc:  # noqa: BLE001 - surface API issues with context
                     LOGGER.error(
-                        "Failed to fetch bookmarks (page %s, max_bookmark_id=%s, attempt=%s): %s",
+                        "Failed to fetch bookmarks (restrict=%s, page=%s, max_bookmark_id=%s, offset=%s, attempt=%s): %s",
+                        restrict_mode,
                         page,
                         max_bookmark_id,
+                        offset,
                         attempt + 1,
                         exc,
                         exc_info=True,
                     )
                     if attempt >= 2:
-                        LOGGER.error("Aborting bookmark retrieval after repeated failures.")
+                        LOGGER.error("Aborting bookmark retrieval after repeated failures (restrict=%s).", restrict_mode)
                         return
                     time.sleep(min(5 * (attempt + 1), 15))
                     try:
@@ -123,45 +142,93 @@ class PixivBookmarkService:
                         LOGGER.warning("Re-authentication attempt failed: %s", auth_exc)
                         time.sleep(2)
 
+            if isinstance(json_result, dict) and 'error' in json_result:
+                error_payload = json_result.get('error') or {}
+                message = error_payload.get('message', '')
+                if message == 'Rate Limit':
+                    LOGGER.warning('Pixiv rate limit encountered (restrict=%s, page=%s); sleeping 30 seconds', restrict_mode, page)
+                    time.sleep(30)
+                    continue
+                LOGGER.error('Pixiv API returned an error (restrict=%s, page=%s): %s', restrict_mode, page, error_payload)
+                return
+
             if not isinstance(json_result, dict):
-                LOGGER.error("Unexpected response while fetching bookmarks: %r", json_result)
+                LOGGER.error("Unexpected response while fetching bookmarks (restrict=%s): %r", restrict_mode, json_result)
                 return
 
             illusts = json_result.get("illusts", [])
+            next_url = json_result.get("next_url")
             LOGGER.info(
-                "Fetched %s bookmarked illustrations (page %s, max_bookmark_id=%s)",
+                "Fetched %s bookmarked illustrations (restrict=%s, page %s, max_bookmark_id=%s, offset=%s)",
                 len(illusts),
+                restrict_mode,
                 page,
                 max_bookmark_id,
+                offset,
             )
 
-            if not illusts:
-                break
+            bookmark_value: str | None = None
+            next_offset: int | None = None
+            if next_url:
+                parsed = urlparse(next_url)
+                query = parse_qs(parsed.query)
+                for key in ("max_bookmark_id", "bookmark_id", "bookmarked_id", "min_bookmark_id", "last_id", "cursor"):
+                    values = query.get(key)
+                    if values:
+                        bookmark_value = values[0]
+                        break
+                offset_values = query.get("offset")
+                if offset_values:
+                    try:
+                        next_offset = int(offset_values[0])
+                    except (TypeError, ValueError):
+                        next_offset = None
 
-            for illust in illusts:
-                yield illust
+            if illusts:
+                for illust in illusts:
+                    illust_id = int(illust.get("id", 0) or 0)
+                    if illust_id <= 0:
+                        continue
+                    if illust_id in seen:
+                        continue
+                    seen.add(illust_id)
+                    yield illust
+            else:
+                if bookmark_value or next_offset is not None:
+                    LOGGER.info(
+                        "Page returned no illustrations but next cursor exists (restrict=%s, page=%s); continuing.",
+                        restrict_mode,
+                        page,
+                    )
+                    max_bookmark_id = bookmark_value
+                    offset = next_offset
+                    page += 1
+                    continue
+                LOGGER.info(
+                    "No illustrations and no further cursor for restrict=%s; stopping pagination.",
+                    restrict_mode,
+                )
+                break
 
             page += 1
             if self._max_pages and page >= self._max_pages:
-                LOGGER.info("Reached configured max pages limit (%s); stopping bookmark fetch.", self._max_pages)
+                LOGGER.info(
+                    "Reached configured max pages limit (%s) for restrict=%s; stopping bookmark fetch.",
+                    self._max_pages,
+                    restrict_mode,
+                )
                 break
 
-            next_url = json_result.get("next_url")
             if not next_url:
-                LOGGER.info("No further bookmark pages available from Pixiv.")
+                LOGGER.info("No further bookmark pages available from Pixiv (restrict=%s).", restrict_mode)
                 break
-            parsed = urlparse(next_url)
-            query = parse_qs(parsed.query)
-            next_max = (
-                query.get("max_bookmark_id")
-                or query.get("bookmark_id")
-                or query.get("bookmarked_id")
-                or query.get("last_id")
-            )
-            if not next_max:
-                LOGGER.info("Next URL lacks max bookmark identifier; stopping pagination. next_url=%s", next_url)
-                break
-            max_bookmark_id = next_max[0]
+            if bookmark_value in {None, "", "0"}:
+                if next_offset is None:
+                    LOGGER.info("Next URL lacks bookmark identifiers; stopping pagination (restrict=%s).", restrict_mode)
+                    break
+            else:
+                max_bookmark_id = bookmark_value
+            offset = next_offset
 
     def fetch_illust_detail(self, illust_id: int) -> Dict | None:
         try:

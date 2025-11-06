@@ -35,8 +35,8 @@ class Config:
         download_dir.mkdir(parents=True, exist_ok=True)
 
         bookmark_restrict = os.getenv("PIXIV_BOOKMARK_RESTRICT", "public").lower()
-        if bookmark_restrict not in {"public", "private"}:
-            raise ValueError("PIXIV_BOOKMARK_RESTRICT must be 'public' or 'private'.")
+        if bookmark_restrict not in {"public", "private", "both"}:
+            raise ValueError("PIXIV_BOOKMARK_RESTRICT must be 'public', 'private', or 'both'.")
 
         max_pages = _int_env("PIXLOADER_MAX_PAGES", default=0, minimum=0)
         interval_seconds = _int_env("PIXLOADER_INTERVAL_SECONDS", default=0, minimum=0)
