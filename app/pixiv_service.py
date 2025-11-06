@@ -172,7 +172,7 @@ class PixivBookmarkService:
             if next_url:
                 parsed = urlparse(next_url)
                 query = parse_qs(parsed.query)
-                for key in ("max_bookmark_id", "bookmark_id", "min_bookmark_id", "cursor"):
+                for key in ("max_bookmark_id", "bookmark_id", "bookmarked_id", "min_bookmark_id", "last_id", "cursor"):
                     values = query.get(key)
                     if values:
                         bookmark_value = values[0]
@@ -222,11 +222,13 @@ class PixivBookmarkService:
             if not next_url:
                 LOGGER.info("No further bookmark pages available from Pixiv (restrict=%s).", restrict_mode)
                 break
-            if bookmark_value in {None, "", "0"} and next_offset is None:
-                LOGGER.info("Next URL lacks bookmark identifiers; stopping pagination (restrict=%s).", restrict_mode)
-                break
-            max_bookmark_id = bookmark_value
-            offset = next_offset
+            if bookmark_value in {None, "", "0"}:
+                if next_offset is None:
+                    LOGGER.info("Next URL lacks bookmark identifiers; stopping pagination (restrict=%s).", restrict_mode)
+                    break
+            else:
+                max_bookmark_id = bookmark_value
+            offset = next_offset origin/master
 
     def fetch_illust_detail(self, illust_id: int) -> Dict | None:
         try:
