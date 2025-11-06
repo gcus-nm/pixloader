@@ -739,6 +739,18 @@
       font-weight: 600;
       font-size: 0.9rem;
     }
+    .rating-badge.quick-rate {
+      cursor: pointer;
+      transition: transform 0.12s ease;
+      touch-action: manipulation;
+    }
+    .rating-badge.quick-rate:not(.is-pending):hover {
+      transform: translateY(-1px);
+    }
+    .rating-badge.quick-rate.is-pending {
+      opacity: 0.65;
+      cursor: progress;
+    }
     .rating-output { letter-spacing: 0.12em; }
     .rating-badge.mode-stars .rating-output {
       letter-spacing: 0.18em;
@@ -1256,6 +1268,7 @@
       }
       const ratingAxisMap = new Map(ratingAxesData.map(axis => [Number(axis.axis_id), axis]));
       const defaultAxisId = Number(body.dataset.defaultAxis || '0');
+      const defaultAxisMax = Number(body.dataset.defaultMax || '5');
 
       function parseAxisScores(editor) {
         if (!editor) {
@@ -1823,6 +1836,11 @@
         modeClasses.forEach(name => {
           badge.classList.toggle(`mode-${name}`, mode === name);
         });
+        const isStarMode = mode === 'stars';
+        badge.classList.toggle('quick-rate', isStarMode);
+        if (!isStarMode) {
+          badge.classList.remove('is-pending');
+        }
         if (!output) {
           return;
         }
@@ -1856,6 +1874,218 @@
 
       function renderAllBadges() {
         document.querySelectorAll('[data-rating-badge]').forEach(renderBadge);
+      }
+
+      const quickRatingPending = new Set();
+
+      function getAxisBadges(illustId, axisId) {
+        return Array.from(
+          document.querySelectorAll(`[data-rating-badge][data-illust-id="${illustId}"]`)
+        ).filter(badge => Number(badge.dataset.axisId) === axisId);
+      }
+
+      function parseCustomTagsValue(value) {
+        if (!value) {
+          return [];
+        }
+        return value
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(Boolean);
+      }
+
+      function getCustomTagsForIllust(illustId) {
+        const editor = document.querySelector(`[data-inline-editor][data-illust-id="${illustId}"]`);
+        if (editor) {
+          return parseCustomTagsValue(editor.dataset.customTags || '');
+        }
+        const tagSource =
+          document.querySelector(`[data-tags][data-illust-id="${illustId}"]`) ||
+          document.querySelector(`[data-info][data-illust-id="${illustId}"]`) ||
+          document.querySelector(`[data-overlay-tags][data-illust-id="${illustId}"]`);
+        if (tagSource && typeof tagSource.dataset.customTags !== 'undefined') {
+          return parseCustomTagsValue(tagSource.dataset.customTags || '');
+        }
+        return [];
+      }
+
+      function updateInlineAxisSelects(editor, axisId, score) {
+        if (!editor) {
+          return;
+        }
+        editor
+          .querySelectorAll(`.inline-axis-select[data-axis-id="${axisId}"]`)
+          .forEach(select => {
+            select.value = String(score);
+          });
+      }
+
+      async function submitQuickRating(illustId, axisId, score, previousScore) {
+        const key = `${illustId}:${axisId}`;
+        if (quickRatingPending.has(key)) {
+          return;
+        }
+        quickRatingPending.add(key);
+
+        const editor = document.querySelector(`[data-inline-editor][data-illust-id="${illustId}"]`);
+        const statusLabel = editor?.querySelector('.inline-status') || null;
+        const previousAxisScoresJson = editor ? editor.dataset.axisScores : null;
+        const previousDefaultRating = editor ? editor.dataset.defaultRating : null;
+
+        const defaultBadge = document.querySelector(
+          `[data-rating-badge][data-illust-id="${illustId}"][data-axis-id="${defaultAxisId}"]`
+        );
+        let defaultScoreBefore = Number(defaultBadge?.dataset.score ?? previousDefaultRating ?? 0);
+        if (!Number.isFinite(defaultScoreBefore)) {
+          defaultScoreBefore = 0;
+        }
+
+        const badges = getAxisBadges(illustId, axisId);
+        const previousScores = new Map(badges.map(b => [b, b.dataset.score]));
+
+        badges.forEach(badge => {
+          badge.dataset.score = String(score);
+          badge.classList.add('is-pending');
+          renderBadge(badge);
+        });
+
+        const customTags = getCustomTagsForIllust(illustId);
+
+        let scoreMap = new Map();
+        if (editor) {
+          scoreMap = parseAxisScores(editor);
+          scoreMap.set(axisId, score);
+          updateInlineAxisSelects(editor, axisId, score);
+          if (axisId === defaultAxisId) {
+            editor.dataset.defaultRating = String(score);
+          }
+          try {
+            editor.dataset.axisScores = JSON.stringify(Object.fromEntries(scoreMap));
+          } catch (error) {
+            console.warn('Failed to serialize axis scores', error);
+          }
+        }
+
+        const payloadAxes = [{ axis_id: axisId, score }];
+        if (axisId !== defaultAxisId) {
+          payloadAxes.push({ axis_id: defaultAxisId, score: defaultScoreBefore });
+        }
+        const payload = {
+          custom_tags: customTags,
+          rating: axisId === defaultAxisId ? score : defaultScoreBefore,
+          axes: payloadAxes,
+        };
+
+        if (statusLabel) {
+          statusLabel.textContent = '保存中…';
+        }
+
+        try {
+          const response = await fetch(`/api/illust/${illustId}/meta`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error('failed to update rating');
+          }
+          const result = await response.json();
+          updateCardAfterSave(illustId, result);
+          if (statusLabel) {
+            statusLabel.textContent = '保存しました';
+            setTimeout(() => {
+              if (statusLabel.textContent === '保存しました') {
+                statusLabel.textContent = '';
+              }
+            }, 2500);
+          }
+        } catch (error) {
+          console.error(error);
+          badges.forEach(badge => {
+            const fallback = previousScores.get(badge);
+            badge.dataset.score = typeof fallback !== 'undefined' ? fallback : String(previousScore);
+            renderBadge(badge);
+          });
+          if (editor) {
+            if (previousAxisScoresJson != null) {
+              editor.dataset.axisScores = previousAxisScoresJson;
+            }
+            if (previousDefaultRating != null) {
+              editor.dataset.defaultRating = previousDefaultRating;
+            }
+            updateInlineAxisSelects(editor, axisId, previousScore);
+          }
+          if (statusLabel) {
+            statusLabel.textContent = '保存に失敗しました';
+            setTimeout(() => {
+              if (statusLabel.textContent === '保存に失敗しました') {
+                statusLabel.textContent = '';
+              }
+            }, 4000);
+          }
+        } finally {
+          quickRatingPending.delete(key);
+          badges.forEach(badge => badge.classList.remove('is-pending'));
+        }
+      }
+
+      function bindQuickRatingBadges() {
+        document.querySelectorAll('[data-rating-badge]').forEach(badge => {
+          if (badge.dataset.quickRateBound === '1') {
+            return;
+          }
+          const mode = (badge.dataset.displayMode || '').toLowerCase();
+          if (mode !== 'stars') {
+            return;
+          }
+          badge.dataset.quickRateBound = '1';
+          badge.addEventListener('click', event => {
+            const currentMode = (badge.dataset.displayMode || '').toLowerCase();
+            if (currentMode !== 'stars') {
+              return;
+            }
+            const illustId = Number(badge.dataset.illustId);
+            const axisId = Number(badge.dataset.axisId);
+            let max = Number(badge.dataset.max ?? defaultAxisMax ?? 5);
+            if (!Number.isFinite(max) || max <= 0) {
+              max = 5;
+            }
+            if (!Number.isFinite(illustId) || !Number.isFinite(axisId)) {
+              return;
+            }
+            const output = badge.querySelector('.rating-output');
+            let rect = output?.getBoundingClientRect?.();
+            if (!rect || rect.width <= 0) {
+              rect = badge.getBoundingClientRect();
+            }
+            if (!rect || rect.width <= 0) {
+              return;
+            }
+            let clientX = Number(event.clientX);
+            if (!Number.isFinite(clientX) && event.changedTouches && event.changedTouches.length) {
+              clientX = event.changedTouches[0].clientX;
+            }
+            if (!Number.isFinite(clientX)) {
+              return;
+            }
+            let relativeX = clientX - rect.left;
+            if (!Number.isFinite(relativeX)) {
+              return;
+            }
+            relativeX = Math.min(Math.max(relativeX, 0), rect.width);
+            const ratio = rect.width > 0 ? Math.min(Math.max(relativeX / rect.width, 0), 1) : 0;
+            let nextScore = Math.ceil(ratio * max);
+            if (event.shiftKey) {
+              nextScore = 0;
+            }
+            nextScore = Math.max(0, Math.min(max, nextScore));
+            const currentScore = Number(badge.dataset.score || '0');
+            if (!Number.isFinite(nextScore) || (!event.shiftKey && nextScore === currentScore)) {
+              return;
+            }
+            submitQuickRating(illustId, axisId, nextScore, currentScore);
+          });
+        });
       }
 
       function renderTagButtons(container, pixivTags, customTags) {
@@ -2065,6 +2295,7 @@
             renderOverlayTagButtons(container, pixivTags, customTags);
           });
 
+        bindQuickRatingBadges();
       }
 
       function bindInlineEditors() {
@@ -2166,6 +2397,7 @@
         });
       }
       renderAllBadges();
+      bindQuickRatingBadges();
       initializeTagPanels();
       bindInlineEditors();
     })();
