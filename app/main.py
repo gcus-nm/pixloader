@@ -84,10 +84,11 @@ def main() -> None:
             sync_controller=sync_controller,
             log_buffer=log_buffer,
         )
+        worker: threading.Thread | None = None
         worker = threading.Thread(
             target=_download_loop,
             name="Downloader",
-            args=(service, config, stop_event, sync_controller),
+            args=(service, config, stop_event, sync_controller, config.auto_sync_on_start),
             daemon=True,
         )
         worker.start()
@@ -102,9 +103,10 @@ def main() -> None:
             LOGGER.info("Viewer interrupted by user.")
         finally:
             stop_event.set()
-            worker.join(timeout=10)
+            if worker is not None:
+                worker.join(timeout=10)
     else:
-        _download_loop(service, config, stop_event, sync_controller)
+        _download_loop(service, config, stop_event, sync_controller, config.auto_sync_on_start)
 
 
 def _sleep_or_exit(interval: int, stop_event: threading.Event) -> bool:
@@ -134,9 +136,28 @@ def _download_loop(
     config: Config,
     stop_event: threading.Event,
     sync_controller: SyncController | None = None,
+    start_immediately: bool = True,
 ) -> None:
+    if not start_immediately and sync_controller is None:
+        LOGGER.info("Automatic sync on start is disabled and no sync controller is available. Skipping download loop.")
+        return
+
     cycle = 0
+    first_cycle = True
     while not stop_event.is_set():
+        if first_cycle and not start_immediately:
+            if sync_controller is not None:
+                LOGGER.info("Waiting for manual sync trigger...")
+                if not sync_controller.wait_for_manual(stop_event):
+                    break
+            else:
+                # Should not reach here due to earlier guard, but keep fallback.
+                if not _sleep_or_exit(config.interval_seconds, stop_event):
+                    break
+            first_cycle = False
+        else:
+            first_cycle = False
+
         cycle += 1
         LOGGER.info("Starting Pixiv bookmark sync cycle %s", cycle)
         if sync_controller is not None:

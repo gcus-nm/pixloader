@@ -1038,32 +1038,34 @@
         <div class="header-actions">
           <a class="link-button" href="{{ url_for('manage_rating_axes') }}">評価軸を管理</a>
           <button type="button" id="sync-now-button">すぐに再取得</button>
+          <button type="button" class="secondary" id="fetch-recent-button">直近100件を取得</button>
           <button type="button" class="secondary" id="toggle-logs">ログを見る</button>
           <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="サイドバーを表示" data-hide-label="サイドバーを隠す">サイドバーを隠す</button>
           <button type="button" class="secondary" id="refresh-button">一覧を更新</button>
         </div>
       </div>
       <div class="status-row">
-        <div class="status-chip" id="sync-status">同期ステータスを確認しています…</div>
+        <div class="status-chip" id="sync-status">Sync status is loading…</div>
         <div class="status-chip" id="metadata-status" data-pending="{{ pending_metadata }}">
           {% if pending_metadata %}
-            未取得メタデータ: 残り {{ pending_metadata }} 件
+            Pending metadata: {{ pending_metadata }} item(s)
           {% else %}
-            メタデータは最新です
+            Metadata is up to date
           {% endif %}
         </div>
+        <div class="status-chip" id="recent-status">Recent bookmark fetch is idle</div>
       </div>
       <div class="maintenance-panel">
         <div class="maintenance-header">
-          <h2>メンテナンス</h2>
+          <h2>Maintenance</h2>
           <div class="maintenance-actions">
-            <button type="button" id="verify-files-button">整合性チェックを実行</button>
-            <button type="button" id="verify-bookmarks-button">ブックマーク照合を実行</button>
+            <button type="button" id="verify-files-button">Run file integrity check</button>
+            <button type="button" id="verify-bookmarks-button">Run bookmark reconciliation</button>
           </div>
         </div>
-        <p class="maintenance-status" id="maintenance-status">まだメンテナンスは実行されていません。</p>
-        <p class="maintenance-hint">ダウンロード済みの作品と保存先を照合し、欠落があれば自動で再取得します。</p>
-        <p class="maintenance-hint">ブックマーク一覧と保存状況を照合し、未取得の作品をダウンロードします。</p>
+        <p class="maintenance-status" id="maintenance-status">Maintenance has not been run yet.</p>
+        <p class="maintenance-hint">Use these tasks to verify downloads and re-fetch anything missing.</p>
+        <p class="maintenance-hint">Bookmark reconciliation and recent fetch use the Pixiv API—avoid running them too frequently.</p>
       </div>
 
       <form class="filters" method="get">
@@ -2146,6 +2148,98 @@
       initializeTagPanels();
       bindInlineEditors();
     })();
-  </script>
+      (function initRecentBookmarkControls() {
+        const recentStatus = document.getElementById('recent-status');
+        const fetchRecentButton = document.getElementById('fetch-recent-button');
+        if (!recentStatus || !fetchRecentButton) {
+          return;
+        }
+
+        const defaultLabel = fetchRecentButton.textContent.trim() || 'Fetch latest 100';
+
+        async function refreshRecentStatus() {
+          try {
+            const response = await fetch('/api/recent/status');
+            if (!response.ok) {
+              throw new Error('failed to fetch recent status');
+            }
+            const data = await response.json();
+            const running = Boolean(data.running);
+            const processed = Number(data.processed || 0);
+            const downloaded = Number(data.downloaded || 0);
+            const skipped = Number(data.skipped || 0);
+            const batches = Number(data.batches || 0);
+            const hasNext = Boolean(data.cursor);
+            const finishedAt = data.last_finished_at ? String(data.last_finished_at).replace('T', ' ') : null;
+
+            if (running) {
+              fetchRecentButton.disabled = true;
+              fetchRecentButton.textContent = 'Fetching...';
+              recentStatus.textContent = `Fetching latest 100... processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`;
+              return;
+            }
+
+            let buttonLabel = batches > 0 ? 'Fetch next 100' : defaultLabel;
+            let statusMessage = 'Recent bookmark fetch is idle';
+
+            if (finishedAt) {
+              statusMessage = `Last fetch: ${finishedAt} / processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`;
+            } else if (batches > 0) {
+              statusMessage = `Last result: processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`;
+            }
+
+            if (!hasNext && batches > 0) {
+              buttonLabel = 'All caught up';
+              fetchRecentButton.disabled = true;
+            } else {
+              fetchRecentButton.disabled = false;
+            }
+
+            fetchRecentButton.textContent = buttonLabel;
+            recentStatus.textContent = data.message ? `${statusMessage}
+${data.message}` : statusMessage;
+          } catch (error) {
+            console.error(error);
+            recentStatus.textContent = 'Failed to refresh recent bookmark status';
+            fetchRecentButton.disabled = false;
+            fetchRecentButton.textContent = defaultLabel;
+          }
+        }
+
+        fetchRecentButton.addEventListener('click', async () => {
+          if (fetchRecentButton.disabled) {
+            return;
+          }
+          fetchRecentButton.disabled = true;
+          fetchRecentButton.textContent = 'Starting...';
+          recentStatus.textContent = 'Starting recent bookmark fetch...';
+          try {
+            const response = await fetch('/api/recent/fetch', { method: 'POST' });
+            if (!response.ok) {
+              let message = 'Failed to fetch recent bookmarks';
+              try {
+                const data = await response.json();
+                if (data && data.message) {
+                  message = data.message;
+                }
+              } catch (_parseError) {
+                // ignore JSON parse errors
+              }
+              throw new Error(message);
+            }
+          } catch (error) {
+            console.error(error);
+            recentStatus.textContent = error.message || 'Failed to fetch recent bookmarks';
+          } finally {
+            await refreshRecentStatus();
+            fetchRecentButton.disabled = false;
+            fetchRecentButton.textContent = defaultLabel;
+          }
+        });
+
+        refreshRecentStatus();
+        setInterval(refreshRecentStatus, 15000);
+      })();
+    </script>
 </body>
 </html>

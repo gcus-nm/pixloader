@@ -24,6 +24,7 @@ class Config:
     enable_viewer: bool = False
     viewer_host: str = "0.0.0.0"
     viewer_port: int = 41412
+    auto_sync_on_start: bool = True
 
     @staticmethod
     def load(require_token: bool = False) -> "Config":
@@ -69,6 +70,7 @@ class Config:
         enable_viewer = _bool_env("PIXLOADER_ENABLE_VIEWER", default=False)
         viewer_port = _int_env("PIXLOADER_VIEWER_PORT", default=41412, minimum=1, maximum=65535)
         viewer_host = os.getenv("PIXLOADER_VIEWER_HOST", "0.0.0.0")
+        auto_sync_on_start = _bool_env("PIXLOADER_AUTO_SYNC_ON_START", default=True)
 
         return Config(
             refresh_token=refresh_token,
@@ -84,6 +86,7 @@ class Config:
             enable_viewer=enable_viewer,
             viewer_host=viewer_host,
             viewer_port=viewer_port,
+            auto_sync_on_start=auto_sync_on_start,
         )
 
 

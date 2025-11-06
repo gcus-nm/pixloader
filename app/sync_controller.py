@@ -75,3 +75,11 @@ class SyncController:
             return not stop_event.is_set()
 
         return not stop_event.is_set()
+
+    def wait_for_manual(self, stop_event: threading.Event) -> bool:
+        """Wait solely for a manual trigger, respecting the stop event."""
+        while not stop_event.is_set():
+            if self._manual_trigger.wait(timeout=0.5):
+                self._manual_trigger.clear()
+                return True
+        return False

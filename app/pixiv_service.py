@@ -193,17 +193,20 @@ class PixivBookmarkService:
                         continue
                     seen.add(illust_id)
                     yield illust
-            else:
+
+            max_bookmark_id = bookmark_value
+            offset = next_offset
+
+            if not illusts:
                 if bookmark_value or next_offset is not None:
                     LOGGER.info(
                         "Page returned no illustrations but next cursor exists (restrict=%s, page=%s); continuing.",
                         restrict_mode,
                         page,
                     )
-                    max_bookmark_id = bookmark_value
-                    offset = next_offset
                     page += 1
                     continue
+
                 LOGGER.info(
                     "No illustrations and no further cursor for restrict=%s; stopping pagination.",
                     restrict_mode,
@@ -336,6 +339,132 @@ class PixivBookmarkService:
             )
 
         return tasks
+
+    def fetch_bookmark_batch(
+        self,
+        *,
+        state: dict | None = None,
+        limit: int = 100,
+    ) -> tuple[list[Dict], dict | None]:
+        """Retrieve a limited batch of bookmarks along with the cursor for the next batch."""
+        if limit <= 0:
+            return [], state
+
+        start_mode_index = 0
+        start_bookmark_id: int | str | None = None
+        start_offset: int | None = None
+        if state:
+            start_mode_index = int(state.get("mode_index", 0) or 0)
+            start_bookmark_id = state.get("bookmark_id")
+            start_offset = state.get("offset")
+
+        results: list[Dict] = []
+        seen: set[int] = set()
+
+        mode_index = start_mode_index
+        while mode_index < len(self._restrict_modes):
+            restrict_mode = self._restrict_modes[mode_index]
+            max_bookmark_id: int | str | None = start_bookmark_id if mode_index == start_mode_index else None
+            offset: int | None = start_offset if mode_index == start_mode_index else None
+            start_bookmark_id = None
+            start_offset = None
+
+            page = 0
+            while True:
+                json_result: Dict | None = None
+                for attempt in range(3):
+                    try:
+                        params: Dict[str, int | str] = {}
+                        if max_bookmark_id not in {None, "", 0, "0"}:
+                            params["max_bookmark_id"] = max_bookmark_id  # type: ignore[assignment]
+                        if offset is not None and offset >= 0:
+                            params["offset"] = offset  # type: ignore[assignment]
+                        json_result = self._api.user_bookmarks_illust(
+                            self._user_id,
+                            restrict=restrict_mode,
+                            **params,
+                        )
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        LOGGER.error(
+                            "Failed to fetch bookmarks (batch, restrict=%s, page=%s, attempt=%s): %s",
+                            restrict_mode,
+                            page,
+                            attempt + 1,
+                            exc,
+                            exc_info=True,
+                        )
+                        if attempt >= 2:
+                            raise RuntimeError("Failed to fetch bookmarks for batch") from exc
+                        time.sleep(min(5 * (attempt + 1), 15))
+                        try:
+                            self._api.auth(refresh_token=self._refresh_token)
+                        except Exception as auth_exc:  # noqa: BLE001
+                            LOGGER.warning("Re-authentication attempt failed during batch fetch: %s", auth_exc)
+                            time.sleep(2)
+
+                if not isinstance(json_result, dict):
+                    raise RuntimeError("Unexpected response while fetching bookmarks for batch")
+                if "error" in json_result:
+                    err = json_result["error"] or {}
+                    msg = err.get("message") or str(err)
+                    raise RuntimeError(msg)
+
+                illusts = json_result.get("illusts", [])
+                for illust in illusts:
+                    illust_id = int(illust.get("id", 0) or 0)
+                    if illust_id <= 0 or illust_id in seen:
+                        continue
+                    seen.add(illust_id)
+                    results.append(illust)
+                    if len(results) >= limit:
+                        next_state = self._extract_next_state(json_result, mode_index)
+                        return results, next_state
+
+                next_url = json_result.get("next_url")
+                if not next_url:
+                    break
+
+                bookmark_value, next_offset = self._parse_next_cursor(next_url)
+                if bookmark_value in {None, "", "0"} and next_offset is None:
+                    break
+                max_bookmark_id = bookmark_value
+                offset = next_offset
+                page += 1
+
+            mode_index += 1
+
+        return results, None
+
+    @staticmethod
+    def _parse_next_cursor(next_url: str) -> tuple[str | None, int | None]:
+        parsed = urlparse(next_url)
+        query = parse_qs(parsed.query)
+        bookmark_value: str | None = None
+        for key in ("max_bookmark_id", "bookmark_id", "bookmarked_id", "min_bookmark_id", "last_id", "cursor"):
+            values = query.get(key)
+            if values:
+                bookmark_value = values[0]
+                break
+        offset_values = query.get("offset")
+        next_offset: int | None = None
+        if offset_values:
+            try:
+                next_offset = int(offset_values[0])
+            except (TypeError, ValueError):
+                next_offset = None
+        return bookmark_value, next_offset
+
+    def _extract_next_state(self, json_result: Dict, mode_index: int) -> dict | None:
+        next_url = json_result.get("next_url")
+        bookmark_value, next_offset = (None, None)
+        if next_url:
+            bookmark_value, next_offset = self._parse_next_cursor(next_url)
+        if bookmark_value in {None, "", "0"} and next_offset is None:
+            if mode_index + 1 < len(self._restrict_modes):
+                return {"mode_index": mode_index + 1, "bookmark_id": None, "offset": None}
+            return None
+        return {"mode_index": mode_index, "bookmark_id": bookmark_value, "offset": next_offset}
 
     def download_image(self, task: ImageTask, target_path: Path) -> bool:
         try:

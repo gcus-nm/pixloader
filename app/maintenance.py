@@ -30,6 +30,15 @@ class VerifyBookmarksResult:
     failed: int
 
 
+@dataclass
+class FetchRecentResult:
+    processed: int
+    downloaded: int
+    skipped: int
+    next_state: dict | None
+    latest_illust: dict | None
+
+
 ProgressCallback = Callable[[int, int, int, int], None]
 
 
@@ -234,6 +243,86 @@ def verify_bookmarks(
         missing=missing,
         repaired=repaired if repair else 0,
         failed=failed if repair else missing,
+    )
+
+
+def fetch_recent_batch(
+    config: Config,
+    *,
+    cursor_state: dict | None,
+    limit: int = 100,
+    progress_callback: ProgressCallback | None = None,
+) -> FetchRecentResult:
+    LOGGER.info("Fetching recent bookmarks batch (limit=%s, cursor=%s)", limit, cursor_state)
+
+    service = PixivBookmarkService(
+        refresh_token=config.refresh_token or "",
+        restrict=config.bookmark_restrict,
+        max_pages=0,
+    )
+    service.authenticate()
+
+    processed = 0
+    downloaded = 0
+    skipped = 0
+
+    with DownloadRegistry(config.database_path) as registry:
+        batch, next_state = service.fetch_bookmark_batch(state=cursor_state, limit=limit)
+        latest_illust = batch[0] if batch else None
+        for illust in batch:
+            processed += 1
+            tasks = service.expand_illust_to_tasks(illust)
+            if not tasks:
+                skipped += 1
+                if progress_callback:
+                    progress_callback(processed, skipped, downloaded, 0)
+                continue
+
+            for task in tasks:
+                target_dir = config.download_dir / task.directory_name
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_path = target_dir / task.filename
+                if target_path.exists():
+                    skipped += 1
+                else:
+                    success = service.download_image(task, target_path)
+                    if not success:
+                        skipped += 1
+                        continue
+                    downloaded += 1
+
+                registry.record_download(
+                    task.illust_id,
+                    task.page_index,
+                    str(target_path),
+                    illust_title=task.title,
+                    artist_name=task.artist_name,
+                    tags=task.tags,
+                    bookmark_count=task.bookmark_count,
+                    view_count=task.view_count,
+                    is_r18=task.is_r18,
+                    is_ai=task.is_ai,
+                    create_date=task.create_date,
+                    bookmarked_at=task.bookmarked_at,
+                )
+
+            if progress_callback:
+                progress_callback(processed, skipped, downloaded, 0)
+
+    LOGGER.info(
+        "Recent batch result: processed=%s downloaded=%s skipped=%s next_state=%s",
+        processed,
+        downloaded,
+        skipped,
+        next_state,
+    )
+
+    return FetchRecentResult(
+        processed=processed,
+        downloaded=downloaded,
+        skipped=skipped,
+        next_state=next_state,
+        latest_illust=latest_illust,
     )
 
 
