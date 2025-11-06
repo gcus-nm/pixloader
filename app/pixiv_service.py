@@ -228,7 +228,7 @@ class PixivBookmarkService:
                     break
             else:
                 max_bookmark_id = bookmark_value
-            offset = next_offset origin/master
+            offset = next_offset
 
     def fetch_illust_detail(self, illust_id: int) -> Dict | None:
         try:
