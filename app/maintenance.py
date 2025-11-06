@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Dict, Any
 
 from .config import Config
 from .pixiv_service import ImageTask, PixivBookmarkService
@@ -30,7 +30,38 @@ class VerifyBookmarksResult:
     failed: int
 
 
+@dataclass
+class FetchRecentResult:
+    processed: int
+    downloaded: int
+    skipped: int
+    next_state: dict | None
+    latest_illust: Dict[str, Any] | None
+
+
 ProgressCallback = Callable[[int, int, int, int], None]
+
+
+def _summarize_latest_illust(illust: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a compact payload describing the freshest bookmark."""
+    user = illust.get("user") or {}
+    illust_id = int(illust.get("id", 0) or 0)
+    bookmark_entry = illust.get("bookmark_data") or {}
+    bookmark_timestamp = (
+        bookmark_entry.get("timestamp")
+        or bookmark_entry.get("created_time")
+        or bookmark_entry.get("time")
+        or bookmark_entry.get("date")
+        or illust.get("bookmark_date")
+    )
+
+    return {
+        "id": illust_id if illust_id > 0 else None,
+        "title": (illust.get("title") or "").strip(),
+        "artist": (user.get("name") or "").strip() if isinstance(user, dict) else "",
+        "bookmarked_at": str(bookmark_timestamp) if bookmark_timestamp else None,
+        "url": f"https://www.pixiv.net/artworks/{illust_id}" if illust_id > 0 else None,
+    }
 
 
 def verify_files(
@@ -234,6 +265,91 @@ def verify_bookmarks(
         missing=missing,
         repaired=repaired if repair else 0,
         failed=failed if repair else missing,
+    )
+
+
+def fetch_recent_batch(
+    config: Config,
+    *,
+    cursor_state: dict | None,
+    limit: int = 100,
+    progress_callback: ProgressCallback | None = None,
+) -> FetchRecentResult:
+    limit = max(1, min(int(limit), 500))
+    LOGGER.info("Fetching recent bookmarks batch (limit=%s, cursor=%s)", limit, cursor_state)
+
+    service = PixivBookmarkService(
+        refresh_token=config.refresh_token or "",
+        restrict=config.bookmark_restrict,
+        max_pages=0,
+    )
+    service.authenticate()
+
+    processed = 0
+    downloaded = 0
+    skipped = 0
+    latest_summary: Dict[str, Any] | None = None
+
+    with DownloadRegistry(config.database_path) as registry:
+        batch, next_state = service.fetch_bookmark_batch(state=cursor_state, limit=limit)
+        if cursor_state is None:
+            next_state = None
+        for index, illust in enumerate(batch):
+            if index == 0:
+                latest_summary = _summarize_latest_illust(illust)
+            processed += 1
+            tasks = service.expand_illust_to_tasks(illust)
+            if not tasks:
+                skipped += 1
+                if progress_callback:
+                    progress_callback(processed, skipped, downloaded, 0)
+                continue
+
+            for task in tasks:
+                target_dir = config.download_dir / task.directory_name
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_path = target_dir / task.filename
+                if target_path.exists():
+                    skipped += 1
+                else:
+                    success = service.download_image(task, target_path)
+                    if not success:
+                        skipped += 1
+                        continue
+                    downloaded += 1
+
+                registry.record_download(
+                    task.illust_id,
+                    task.page_index,
+                    str(target_path),
+                    illust_title=task.title,
+                    artist_name=task.artist_name,
+                    tags=task.tags,
+                    bookmark_count=task.bookmark_count,
+                    view_count=task.view_count,
+                    is_r18=task.is_r18,
+                    is_ai=task.is_ai,
+                    create_date=task.create_date,
+                    bookmarked_at=task.bookmarked_at,
+                )
+
+            if progress_callback:
+                progress_callback(processed, skipped, downloaded, 0)
+
+    LOGGER.info(
+        "Recent batch result: processed=%s downloaded=%s skipped=%s next_state=%s",
+        processed,
+        downloaded,
+        skipped,
+        next_state,
+    )
+
+    return FetchRecentResult(
+        processed=processed,
+        downloaded=downloaded,
+        skipped=skipped,
+        next_state=next_state,
+        latest_illust=latest_summary,
     )
 
 

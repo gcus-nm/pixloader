@@ -87,5 +87,6 @@ PIXLOADER_HOST_ROOT=D:\\pixiv\\bookmarks
 | `PIXLOADER_VIEWER_PORT` | `8081` | ビューアの公開ポート。 |
 | `PIXLOADER_VIEWER_HOST` | `0.0.0.0` | ビューアがバインドするホスト名。LAN に公開する場合のみ変更してください。 |
 | `PIXLOADER_HOST_ROOT` | `./data` | ホスト側で `/data` にマウントするディレクトリ。例: `PIXLOADER_HOST_ROOT=D:\\Pixloader-image` |
+| `PIXLOADER_AUTO_SYNC_ON_START` | `true` | コンテナ起動時に自動でブックマーク同期を開始します。全件取得後はFalseにすることをおすすめします。 |
 
 > **Windows の場合:** Docker Desktop の Settings → Resources → File sharing で対象ドライブ (例: D:) を共有しておく必要があります。

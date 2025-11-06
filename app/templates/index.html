@@ -1036,34 +1036,57 @@
       <div class="sidebar-top">
         <h1>Pixloader Viewer</h1>
         <div class="header-actions">
-          <a class="link-button" href="{{ url_for('manage_rating_axes') }}">評価軸を管理</a>
-          <button type="button" id="sync-now-button">すぐに再取得</button>
-          <button type="button" class="secondary" id="toggle-logs">ログを見る</button>
-          <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="サイドバーを表示" data-hide-label="サイドバーを隠す">サイドバーを隠す</button>
-          <button type="button" class="secondary" id="refresh-button">一覧を更新</button>
+          <a class="link-button" href="{{ url_for('manage_rating_axes') }}">Manage rating axes</a>
+          <button type="button" id="sync-now-button">Sync now</button>
+          <input
+            type="number"
+            id="fetch-recent-limit"
+            class="secondary select-inline"
+            min="1"
+            max="500"
+            step="25"
+            value="100"
+            list="fetch-recent-presets"
+            aria-label="Number of recent bookmarks to fetch"
+          >
+          <datalist id="fetch-recent-presets">
+            <option value="25">Latest 25</option>
+            <option value="50">Latest 50</option>
+            <option value="75">Latest 75</option>
+            <option value="100">Latest 100</option>
+            <option value="150">Latest 150</option>
+            <option value="200">Latest 200</option>
+            <option value="300">Latest 300</option>
+            <option value="500">Latest 500</option>
+          </datalist>
+          <button type="button" class="secondary" id="fetch-recent-button">Fetch latest 100</button>
+          <button type="button" class="secondary" id="toggle-logs">Show logs</button>
+          <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="Show sidebar" data-hide-label="Hide sidebar">Hide sidebar</button>
+          <button type="button" class="secondary" id="refresh-button">Refresh list</button>
         </div>
       </div>
       <div class="status-row">
-        <div class="status-chip" id="sync-status">同期ステータスを確認しています…</div>
+        <div class="status-chip" id="sync-status">Sync status is loading…</div>
         <div class="status-chip" id="metadata-status" data-pending="{{ pending_metadata }}">
           {% if pending_metadata %}
-            未取得メタデータ: 残り {{ pending_metadata }} 件
+            Pending metadata: {{ pending_metadata }} item(s)
           {% else %}
-            メタデータは最新です
+            Metadata is up to date
           {% endif %}
         </div>
+        <div class="status-chip" id="recent-status">Recent bookmark fetch is idle</div>
       </div>
       <div class="maintenance-panel">
         <div class="maintenance-header">
-          <h2>メンテナンス</h2>
+          <h2>Maintenance</h2>
           <div class="maintenance-actions">
-            <button type="button" id="verify-files-button">整合性チェックを実行</button>
-            <button type="button" id="verify-bookmarks-button">ブックマーク照合を実行</button>
+            <button type="button" id="verify-files-button">Run file integrity check</button>
+            <button type="button" id="verify-bookmarks-button">Run bookmark reconciliation</button>
           </div>
         </div>
-        <p class="maintenance-status" id="maintenance-status">まだメンテナンスは実行されていません。</p>
-        <p class="maintenance-hint">ダウンロード済みの作品と保存先を照合し、欠落があれば自動で再取得します。</p>
-        <p class="maintenance-hint">ブックマーク一覧と保存状況を照合し、未取得の作品をダウンロードします。</p>
+        <p class="maintenance-status" id="maintenance-status">Maintenance has not been run yet.</p>
+        <p class="maintenance-hint">Use these tasks to verify downloads and re-fetch anything missing.</p>
+        <p class="maintenance-hint">Bookmark reconciliation and recent fetch use the Pixiv API—avoid running them too frequently.</p>
       </div>
 
       <form class="filters" method="get">
@@ -2146,6 +2169,204 @@
       initializeTagPanels();
       bindInlineEditors();
     })();
-  </script>
+      (function initRecentBookmarkControls() {
+        const recentStatus = document.getElementById('recent-status');
+        const fetchRecentButton = document.getElementById('fetch-recent-button');
+        const fetchRecentLimitInput = document.getElementById('fetch-recent-limit');
+        if (!recentStatus || !fetchRecentButton) {
+          return;
+        }
+
+        const clampLimit = (value) => {
+          const numeric = Number(value);
+          if (!Number.isFinite(numeric)) {
+            return 100;
+          }
+          return Math.max(1, Math.min(500, Math.floor(numeric)));
+        };
+
+        const getSelectedLimit = () => clampLimit(fetchRecentLimitInput ? fetchRecentLimitInput.value : 100);
+        const formatButtonLabel = (limit) => `Fetch latest ${limit}`;
+
+        let idleLabel = formatButtonLabel(getSelectedLimit());
+
+        const setIdleLabel = (limit) => {
+          idleLabel = formatButtonLabel(limit);
+          if (!fetchRecentButton.disabled) {
+            fetchRecentButton.textContent = idleLabel;
+          }
+        };
+
+        const renderStatus = (lines, latestInfo) => {
+          recentStatus.replaceChildren();
+          const mergedLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
+          mergedLines.forEach((line, index) => {
+            if (index > 0) {
+              recentStatus.appendChild(document.createElement('br'));
+            }
+            const span = document.createElement('span');
+            span.textContent = line;
+            recentStatus.appendChild(span);
+          });
+
+          if (latestInfo && latestInfo.title) {
+            if (recentStatus.childNodes.length > 0) {
+              recentStatus.appendChild(document.createElement('br'));
+            }
+            const prefix = document.createElement('span');
+            prefix.textContent = 'Latest bookmark: ';
+            recentStatus.appendChild(prefix);
+
+            if (latestInfo.url) {
+              const link = document.createElement('a');
+              link.href = latestInfo.url;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              link.textContent = latestInfo.title;
+              recentStatus.appendChild(link);
+            } else {
+              const titleSpan = document.createElement('span');
+              titleSpan.textContent = latestInfo.title;
+              recentStatus.appendChild(titleSpan);
+            }
+
+            const metaPieces = [];
+            if (latestInfo.artist) {
+              metaPieces.push(latestInfo.artist);
+            }
+            if (latestInfo.bookmarked_at) {
+              metaPieces.push(String(latestInfo.bookmarked_at).replace('T', ' '));
+            }
+            if (metaPieces.length) {
+              const metaSpan = document.createElement('span');
+              metaSpan.textContent = ` (${metaPieces.join(' • ')})`;
+              recentStatus.appendChild(metaSpan);
+            }
+          }
+
+          if (!recentStatus.childNodes.length) {
+            recentStatus.textContent = 'Recent bookmark fetch is idle';
+          }
+        };
+
+        const setRunningState = (limit, processed, downloaded, skipped) => {
+          fetchRecentButton.disabled = true;
+          if (fetchRecentLimitInput) {
+            fetchRecentLimitInput.disabled = true;
+          }
+          fetchRecentButton.textContent = `Fetching latest ${limit}...`;
+          renderStatus([
+            `Fetching latest ${limit}...`,
+            `progress: processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`,
+          ]);
+        };
+
+        const applyIdleState = (limit, lines, latestInfo) => {
+          if (fetchRecentLimitInput) {
+            fetchRecentLimitInput.disabled = false;
+            fetchRecentLimitInput.value = String(limit);
+          }
+          fetchRecentButton.disabled = false;
+          setIdleLabel(limit);
+          renderStatus(lines, latestInfo);
+        };
+
+        async function refreshRecentStatus() {
+          try {
+            const response = await fetch('/api/recent/status');
+            if (!response.ok) {
+              throw new Error('failed to fetch recent status');
+            }
+            const data = await response.json();
+            const running = Boolean(data.running);
+            const processed = Number(data.processed || 0);
+            const downloaded = Number(data.downloaded || 0);
+            const skipped = Number(data.skipped || 0);
+            const finishedAt = data.last_finished_at ? String(data.last_finished_at).replace('T', ' ') : null;
+            const limitFromState = clampLimit(data.limit || getSelectedLimit());
+            if (fetchRecentLimitInput && !fetchRecentLimitInput.disabled) {
+              fetchRecentLimitInput.value = String(limitFromState);
+            }
+
+            if (running) {
+              setRunningState(limitFromState, processed, downloaded, skipped);
+              return;
+            }
+
+            const summaryLines = [];
+            if (finishedAt) {
+              summaryLines.push(`Last fetch: ${finishedAt}`);
+            }
+            summaryLines.push(`Processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`);
+            if (data.message) {
+              summaryLines.push(data.message);
+            }
+
+            const latestInfo = {
+              title: data.latest_title,
+              url: data.latest_url,
+              artist: data.latest_artist,
+              bookmarked_at: data.latest_bookmarked_at,
+            };
+
+            applyIdleState(limitFromState, summaryLines, latestInfo);
+          } catch (error) {
+            console.error(error);
+            if (fetchRecentLimitInput) {
+              fetchRecentLimitInput.disabled = false;
+            }
+            fetchRecentButton.disabled = false;
+            fetchRecentButton.textContent = idleLabel;
+            recentStatus.textContent = 'Failed to refresh recent bookmark status';
+          }
+        }
+
+        fetchRecentButton.addEventListener('click', async () => {
+          if (fetchRecentButton.disabled) {
+            return;
+          }
+          const limitToUse = getSelectedLimit();
+          setRunningState(limitToUse, 0, 0, 0);
+          try {
+            const response = await fetch('/api/recent/fetch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ limit: limitToUse }),
+            });
+            if (!response.ok) {
+              let message = 'Failed to fetch recent bookmarks';
+              try {
+                const data = await response.json();
+                if (data && data.message) {
+                  message = data.message;
+                }
+              } catch (_parseError) {
+                // ignore JSON parse errors
+              }
+              throw new Error(message);
+            }
+          } catch (error) {
+            console.error(error);
+            applyIdleState(getSelectedLimit(), ['Failed to fetch recent bookmarks', error.message], null);
+            return;
+          }
+          await refreshRecentStatus();
+        });
+
+        if (fetchRecentLimitInput) {
+          const handleLimitChange = () => {
+            const current = getSelectedLimit();
+            fetchRecentLimitInput.value = String(current);
+            setIdleLabel(current);
+          };
+          fetchRecentLimitInput.addEventListener('change', handleLimitChange);
+          fetchRecentLimitInput.addEventListener('input', handleLimitChange);
+        }
+
+        setIdleLabel(getSelectedLimit());
+        refreshRecentStatus();
+        setInterval(refreshRecentStatus, 30000);
+      })();
+    </script>
 </body>
 </html>

@@ -15,7 +15,7 @@ from typing import Any, Sequence
 
 from .logging_utils import LogBuffer
 from .config import Config
-from .maintenance import verify_files
+from .maintenance import fetch_recent_batch, verify_bookmarks, verify_files
 from .sync_controller import SyncController
 
 
@@ -161,6 +161,25 @@ def create_viewer_app(
         "task": None,
     }
     maintenance_thread: threading.Thread | None = None
+    recent_lock = threading.RLock()
+    recent_state = {
+        "running": False,
+        "last_started_at": None,
+        "last_finished_at": None,
+        "processed": 0,
+        "downloaded": 0,
+        "skipped": 0,
+        "message": None,
+        "cursor": None,
+        "batches": 0,
+        "limit": 100,
+        "latest_title": None,
+        "latest_illust_id": None,
+        "latest_artist": None,
+        "latest_bookmarked_at": None,
+        "latest_url": None,
+    }
+    recent_thread: threading.Thread | None = None
 
     def _update_maintenance(**kwargs) -> None:
         with maintenance_lock:
@@ -186,24 +205,24 @@ def create_viewer_app(
             config = Config.load(require_token=True)
             if task_name == "files":
                 result = verify_files(config, repair=True, progress_callback=progress_callback)
-                message = None if result.failed == 0 else '????t?@?C?????C???????????????B??????O???m?F????????????B'
+                message = None if result.failed == 0 else '一部のファイルを修復できませんでした。詳細はログを確認してください。'
             elif task_name == "bookmarks":
                 result = verify_bookmarks(config, repair=True, progress_callback=progress_callback)
                 if result.failed:
-                    message = '???????u?b?N?}?[?N???????s????????B????????O???m?F????????????B'
+                    message = '一部のブックマーク取得で失敗しました。詳細はログを確認してください。'
                 elif result.missing:
-                    message = '?????u?b?N?}?[?N??????????????????????B'
+                    message = '一部のブックマークは保存済みのようです。'
                 else:
-                    message = '???????u?b?N?}?[?N???S???????????????B'
+                    message = 'すべてのブックマークが最新になりました。'
             else:
                 raise ValueError(f"Unknown maintenance task: {task_name}")
             _update_maintenance(
                 running=False,
                 last_finished_at=datetime.utcnow().isoformat(),
-                checked=result.checked,
-                missing=result.missing,
-                repaired=result.repaired,
-                failed=result.failed,
+                checked=getattr(result, 'checked', getattr(result, 'processed', 0)),
+                missing=getattr(result, 'missing', getattr(result, 'skipped', 0)),
+                repaired=getattr(result, 'repaired', getattr(result, 'downloaded', 0)),
+                failed=getattr(result, 'failed', 0),
                 message=message,
                 task=task_name,
             )
@@ -953,10 +972,10 @@ def create_viewer_app(
         if sync_controller is not None:
             status = sync_controller.get_status()
             if status.in_progress:
-                return False, '??????????s????????B'
+                return False, "ダウンロード処理中のため実行できません。"
         with maintenance_lock:
             if maintenance_state['running']:
-                return False, '???????`?F?b?N??i?s??????B'
+                return False, "メンテナンスは既に実行中です。"
             _update_maintenance(
                 running=True,
                 last_started_at=datetime.utcnow().isoformat(),
@@ -969,6 +988,7 @@ def create_viewer_app(
             )
             maintenance_thread = threading.Thread(target=lambda: _run_maintenance_task(task_name), daemon=True)
             maintenance_thread.start()
+            LOGGER.info("_start_recent_fetch returning True")
         return True, None
 
     @app.route('/api/maintenance/verify-files', methods=['POST'])
@@ -983,6 +1003,138 @@ def create_viewer_app(
         ok, message = _start_maintenance('bookmarks')
         if not ok:
             return jsonify({'ok': False, 'message': message}), HTTPStatus.CONFLICT
+        return jsonify({'ok': True})
+
+    def _update_recent(**kwargs) -> None:
+        with recent_lock:
+            recent_state.update(kwargs)
+
+    def _recent_snapshot() -> dict[str, object]:
+        with recent_lock:
+            return dict(recent_state)
+
+    def _start_recent_fetch(limit: int) -> tuple[bool, str | None]:
+        nonlocal recent_thread
+        if sync_controller is not None:
+            status = sync_controller.get_status()
+            if status.in_progress:
+                return False, "Cannot start a recent fetch while downloads are running."
+        with maintenance_lock:
+            maintenance_running = maintenance_state["running"]
+        if maintenance_running:
+            return False, "Finish the maintenance task before starting a recent fetch."
+
+        with recent_lock:
+            if recent_state["running"]:
+                return False, "A recent fetch is already running."
+            recent_state["limit"] = limit
+            cursor_state = None
+            LOGGER.info("Starting recent bookmark fetch (cursor=%s, limit=%s)", cursor_state, limit)
+            _update_recent(
+                running=True,
+                last_started_at=datetime.utcnow().isoformat(),
+                last_finished_at=None,
+                processed=0,
+                downloaded=0,
+                skipped=0,
+                message="Fetching recent bookmarks...",
+                cursor=cursor_state,
+                batches=0,
+                latest_title=None,
+                latest_illust_id=None,
+                latest_artist=None,
+                latest_bookmarked_at=None,
+                latest_url=None,
+            )
+
+            def progress_callback(processed: int, skipped: int, downloaded: int, _failed: int) -> None:
+                _update_recent(processed=processed, skipped=skipped, downloaded=downloaded)
+
+            def runner(previous_cursor: dict | None) -> None:
+                nonlocal recent_thread
+                try:
+                    config = Config.load(require_token=True)
+                    result = fetch_recent_batch(
+                        config,
+                        cursor_state=None,
+                        limit=limit,
+                        progress_callback=progress_callback,
+                    )
+                    with recent_lock:
+                        batches = int(recent_state.get("batches", 0))
+                    if result.processed:
+                        batches += 1
+                    limit_snapshot = limit
+                    if result.downloaded:
+                        message = f"Downloaded {result.downloaded} new item(s) from the latest {limit_snapshot} bookmark(s)."
+                    elif result.processed:
+                        message = f"No new items found within the latest {limit_snapshot} bookmark(s)."
+                    else:
+                        message = f"No bookmarks were available within the latest {limit_snapshot} entries."
+                    latest_payload = result.latest_illust or {}
+                    latest_id = latest_payload.get("id")
+                    if isinstance(latest_id, str):
+                        try:
+                            latest_id = int(latest_id)
+                        except ValueError:
+                            pass
+                    _update_recent(
+                        running=False,
+                        last_finished_at=datetime.utcnow().isoformat(),
+                        processed=result.processed,
+                        downloaded=result.downloaded,
+                        skipped=result.skipped,
+                        cursor=None,
+                        batches=batches,
+                        message=message,
+                        latest_title=(latest_payload.get("title") or None) if latest_payload else None,
+                        latest_illust_id=latest_id if latest_id else None,
+                        latest_artist=(latest_payload.get("artist") or None) if latest_payload else None,
+                        latest_bookmarked_at=(latest_payload.get("bookmarked_at") or None) if latest_payload else None,
+                        latest_url=(latest_payload.get("url") or None) if latest_payload else None,
+                    )
+                    LOGGER.info(
+                        "Recent fetch finished: processed=%s downloaded=%s skipped=%s next_cursor=%s",
+                        result.processed,
+                        result.downloaded,
+                        result.skipped,
+                        result.next_state,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    LOGGER.error("Recent bookmark fetch failed: %s", exc, exc_info=True)
+                    _update_recent(
+                        running=False,
+                        last_finished_at=datetime.utcnow().isoformat(),
+                        message=str(exc),
+                    )
+                finally:
+                    with recent_lock:
+                        recent_thread = None
+
+            recent_thread = threading.Thread(target=lambda: runner(cursor_state), daemon=True)
+            recent_thread.start()
+            LOGGER.info("Recent fetch worker thread started; returning immediately")
+        return True, None
+
+    @app.route('/api/recent/status')
+    def api_recent_status():
+        return jsonify(_recent_snapshot())
+
+    @app.route('/api/recent/fetch', methods=['POST'])
+    def api_recent_fetch():
+        LOGGER.info('Handling /api/recent/fetch request')
+        payload = request.get_json(silent=True) or {}
+        try:
+            limit_value = int(payload.get("limit", 100))
+        except (TypeError, ValueError):
+            limit_value = 100
+        limit_value = max(1, min(limit_value, 500))
+        LOGGER.info('API call: /api/recent/fetch (limit=%s)', limit_value)
+        ok, message = _start_recent_fetch(limit_value)
+        if not ok:
+            LOGGER.info('Recent fetch request failed: %s', message)
+            return jsonify({'ok': False, 'message': message}), HTTPStatus.CONFLICT
+        LOGGER.info('Recent fetch request accepted')
         return jsonify({'ok': True})
 
     @app.route('/api/logs')
