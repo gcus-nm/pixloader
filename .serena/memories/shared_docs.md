@@ -1,0 +1,3 @@
+- human_agent_doc: AGENTS.md
+- summary: Pixloader の超詳細日本語ガイド。構成、設定一覧、処理フロー、コンポーネント、API、データスキーマ、メンテタスク、スレッド、エッジケース、運用ヒントを網羅し docs/pixloader_agent_spec.json へのリンクを明示
+- updated_at: 2025-11-06

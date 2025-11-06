@@ -1,0 +1,360 @@
+{
+  "spec_version": "2025-11-06T00:00:00Z",
+  "context": {
+    "project": "pixloader",
+    "entry_point": "python -m app.main",
+    "primary_language": "python",
+    "runtime": "python3.11",
+    "dependencies": [
+      "pixivpy3==3.7.2",
+      "requests==2.31.0",
+      "tenacity==8.2.3",
+      "python-dotenv==1.0.1",
+      "Flask==3.0.3"
+    ],
+    "execution_environment": {
+      "dockerfile": "Dockerfile",
+      "compose_service": "docker-compose.yml#services.pixloader",
+      "default_volume": "/data",
+      "default_download_dir": "/data/downloads"
+    }
+  },
+  "configuration": {
+    "source": "app/config.py",
+    "env_vars": {
+      "PIXIV_REFRESH_TOKEN": {
+        "required": true,
+        "description": "Pixiv OAuth refresh token; read from env or token file.",
+        "validation": "stripped non-empty"
+      },
+      "PIXIV_BOOKMARK_RESTRICT": {
+        "required": false,
+        "default": "public",
+        "allowed_values": [
+          "public",
+          "private",
+          "both"
+        ]
+      },
+      "PIXLOADER_DOWNLOAD_DIR": {
+        "required": false,
+        "default": "./downloads",
+        "behavior": "created if missing; becomes root of downloads and derived defaults"
+      },
+      "PIXLOADER_DB_PATH": {
+        "required": false,
+        "default": "<download_dir>/pixloader.db"
+      },
+      "PIXLOADER_TOKEN_FILE": {
+        "required": false,
+        "default": "<download_dir>/refresh_token.txt"
+      },
+      "PIXLOADER_MAX_PAGES": {
+        "required": false,
+        "type": "int",
+        "default": 0,
+        "min": 0
+      },
+      "PIXLOADER_INTERVAL_SECONDS": {
+        "required": false,
+        "type": "int",
+        "default": 0,
+        "min": 0
+      },
+      "PIXLOADER_CONCURRENCY": {
+        "required": false,
+        "type": "int",
+        "default": 4,
+        "min": 1,
+        "max": 16
+      },
+      "PIXLOADER_TOKEN_PORT": {
+        "required": false,
+        "type": "int",
+        "default": 8080,
+        "min": 1,
+        "max": 65535
+      },
+      "PIXLOADER_ALLOW_PASSWORD_LOGIN": {
+        "required": false,
+        "type": "bool",
+        "default": false
+      },
+      "PIXLOADER_ENABLE_VIEWER": {
+        "required": false,
+        "type": "bool",
+        "default": false
+      },
+      "PIXLOADER_VIEWER_HOST": {
+        "required": false,
+        "default": "0.0.0.0"
+      },
+      "PIXLOADER_VIEWER_PORT": {
+        "required": false,
+        "type": "int",
+        "default": 41412,
+        "min": 1,
+        "max": 65535
+      },
+      "PIXLOADER_AUTO_SYNC_ON_START": {
+        "required": false,
+        "type": "bool",
+        "default": true
+      }
+    },
+    "token_bootstrap": {
+      "condition": "config.refresh_token missing",
+      "mechanism": "TokenInputServer on PIXLOADER_TOKEN_PORT",
+      "token_file": "PIXLOADER_TOKEN_FILE",
+      "blocking": true
+    }
+  },
+  "data_stores": {
+    "database": {
+      "path": "config.database_path",
+      "engine": "sqlite3",
+      "tables": {
+        "downloads": {
+          "primary_key": [
+            "illust_id",
+            "page"
+          ],
+          "columns": [
+            "file_path TEXT NOT NULL",
+            "illust_title TEXT",
+            "artist_name TEXT",
+            "downloaded_at TEXT DEFAULT CURRENT_TIMESTAMP",
+            "tags TEXT DEFAULT '[]'",
+            "bookmark_count INTEGER DEFAULT 0",
+            "view_count INTEGER DEFAULT 0",
+            "is_r18 INTEGER DEFAULT 0",
+            "is_ai INTEGER DEFAULT 0",
+            "create_date TEXT",
+            "bookmarked_at TEXT",
+            "metadata_synced INTEGER DEFAULT 0"
+          ]
+        },
+        "illustration_meta": {
+          "primary_key": [
+            "illust_id"
+          ],
+          "columns": [
+            "custom_tags TEXT DEFAULT '[]'",
+            "rating INTEGER DEFAULT 0"
+          ]
+        },
+        "rating_axes": {
+          "initialized_by": "viewer_app._ensure_rating_tables",
+          "default_row": {
+            "name": "Star",
+            "max_score": 5,
+            "display_mode": "stars"
+          }
+        },
+        "illustration_ratings": {
+          "primary_key": [
+            "illust_id",
+            "axis_id"
+          ]
+        }
+      }
+    },
+    "filesystem": {
+      "download_root": "config.download_dir",
+      "structure": "per-illustration directory: <illust_id>_<slugified_title>",
+      "filename_pattern": "<illust_id>_p<page_index:02d><extension>",
+      "token_file": "config.token_file"
+    }
+  },
+  "core_components": {
+    "Downloader": {
+      "module": "app/downloader.py",
+      "class": "DownloadManager",
+      "inputs": [
+        "PixivBookmarkService.iter_bookmarks()",
+        "DownloadRegistry.is_downloaded()"
+      ],
+      "concurrency": "ThreadPoolExecutor max_workers=config.concurrency",
+      "skip_logic": [
+        "if db record and file present -> skip",
+        "if db record missing file -> re-download"
+      ],
+      "success_callback": "DownloadRegistry.record_download"
+    },
+    "PixivService": {
+      "module": "app/pixiv_service.py",
+      "authenticate": "refresh_token via AppPixivAPI",
+      "bookmark_iteration": {
+        "handles_modes": [
+          "public",
+          "private"
+        ],
+        "rate_limit_behavior": "sleep 30 seconds on message 'Rate Limit'",
+        "next_url_parsing": "supports max_bookmark_id, offset, cursor variants"
+      },
+      "image_tasks": {
+        "fields": [
+          "illust_id",
+          "title",
+          "page_index",
+          "url",
+          "extension",
+          "artist_name",
+          "directory_name",
+          "filename",
+          "tags",
+          "bookmark_count",
+          "view_count",
+          "is_r18",
+          "is_ai",
+          "create_date",
+          "bookmarked_at"
+        ]
+      },
+      "download": {
+        "headers": {
+          "Referer": "https://app-api.pixiv.net/"
+        },
+        "retry_policy": "tenacity retry 5 attempts exponential backoff 1-10s"
+      }
+    },
+    "SyncLoop": {
+      "module": "app/main.py",
+      "function": "_download_loop",
+      "lifecycle": [
+        "authenticate user",
+        "DownloadRegistry context manager",
+        "metadata backfill via _backfill_metadata",
+        "DownloadManager.run",
+        "SyncController interval wait or manual trigger"
+      ],
+      "error_handling": {
+        "authentication": "log error, mark cycle error, wait for next cycle",
+        "download": "log error, mark cycle error"
+      }
+    },
+    "MetadataBackfill": {
+      "module": "app/main.py",
+      "function": "_backfill_metadata",
+      "batch_size": 25,
+      "flow": [
+        "DownloadRegistry.illustrations_missing_metadata",
+        "PixivBookmarkService.fetch_illust_detail",
+        "DownloadRegistry.update_metadata",
+        "DownloadRegistry.mark_metadata_synced"
+      ],
+      "missing_handling": "if illust detail absent -> mark metadata_synced=1"
+    },
+    "ViewerApp": {
+      "module": "app/viewer_app.py",
+      "framework": "Flask",
+      "routes": {
+        "/": "gallery listing with filters and pagination",
+        "/illust/<id>": "detail view with image list",
+        "/files/<path>": "send_from_directory after traversal check",
+        "/api/sync/status": "SyncController snapshot + pending metadata count",
+        "/api/sync/start": "request manual sync (503 if controller missing)",
+        "/api/maintenance/status": "maintenance task state",
+        "/api/maintenance/verify-files": "launch maintenance.verify_files",
+        "/api/maintenance/verify-bookmarks": "launch maintenance.verify_bookmarks",
+        "/api/recent/status": "recent fetch state",
+        "/api/recent/fetch": "launch maintenance.fetch_recent_batch via thread",
+        "/api/logs": "return recent log buffer entries",
+        "/api/illust/<id>/meta": "update custom tags + ratings JSON",
+        "/settings/rating-axes": "manage rating axes (create/update/delete)"
+      },
+      "state_guards": {
+        "maintenance": "reject if sync in progress or maintenance running",
+        "recent_fetch": "reject if sync or maintenance active or already running"
+      }
+    },
+    "TokenServer": {
+      "module": "app/token_server.py",
+      "endpoint_root": "/",
+      "features": [
+        "PKCE OAuth session bootstrap",
+        "AJAX polling state endpoint",
+        "code submission via /exchange",
+        "token stored to file and signals Event"
+      ]
+    }
+  },
+  "maintenance": {
+    "verify_files": {
+      "module": "app/maintenance.py",
+      "requires_auth": true,
+      "repairs": "downloads missing files by re-fetching via PixivService",
+      "progress_callback_interval": 100
+    },
+    "verify_bookmarks": {
+      "module": "app/maintenance.py",
+      "scans": "Pixiv bookmarks and ensures DB coverage",
+      "repair_mode": "downloads missing illustrations when repair=True"
+    },
+    "fetch_recent_batch": {
+      "module": "app/maintenance.py",
+      "cursor_strategy": "delegated to PixivBookmarkService.fetch_bookmark_batch",
+      "download_logic": "skip if file exists else download and record"
+    }
+  },
+  "sync_controller": {
+    "module": "app/sync_controller.py",
+    "interval_mode": "seconds, 0 disables automatic repeat",
+    "manual_trigger": "Event-based; request_sync sets event",
+    "status_fields": [
+      "in_progress",
+      "last_started_at",
+      "last_finished_at",
+      "last_error",
+      "last_cycle"
+    ]
+  },
+  "logging": {
+    "module": "app/logging_utils.py",
+    "buffer": {
+      "size": 500,
+      "handler": "LogBufferHandler capturing timestamp UTC ISO8601, level, name, message",
+      "api_access": "/api/logs?limit=<1-500>"
+    }
+  },
+  "process_flow": [
+    "start main -> configure logging -> install signal handlers",
+    "load Config -> ensure download directories",
+    "if refresh_token missing -> launch TokenInputServer and block until token or stop event",
+    "instantiate PixivBookmarkService, SyncController",
+    "if viewer enabled -> start download loop thread and run Flask app",
+    "otherwise run download loop synchronously",
+    "download loop handles authenticate, metadata backfill, concurrent downloads, then waits for interval/manual trigger"
+  ],
+  "edge_cases": [
+    "PIXIV rate limit -> log warning and sleep 30s before retrying page",
+    "missing download file with registry record -> scheduled for re-download",
+    "illust detail unavailable during backfill -> mark metadata_synced to avoid blocking",
+    "token server port in use -> startup error and exit",
+    "viewer maintenance requests while sync running -> 409 with message"
+  ],
+  "interfaces_for_agents": {
+    "start_commands": [
+      "python -m app.main",
+      "docker compose up -d --build (per README)"
+    ],
+    "critical_files": [
+      "app/main.py",
+      "app/pixiv_service.py",
+      "app/downloader.py",
+      "app/storage.py",
+      "app/viewer_app.py",
+      "app/token_server.py",
+      "app/maintenance.py"
+    ],
+    "data_contracts": {
+      "DownloadRegistry.record_download": "requires all ImageTask fields; tags tuple serialized to JSON",
+      "Viewer API /api/illust/<id>/meta": "accepts rating int, custom_tags list or comma string, axes array with axis_id and score"
+    },
+    "threading_notes": [
+      "DownloadRegistry uses threading.Lock around sqlite operations",
+      "Viewer maintenance and recent fetch threads guard shared state with locks",
+      "Sync loop stop_event checked between cycles"
+    ]
+  }
+}

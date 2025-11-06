@@ -1,0 +1,3 @@
+- generated_spec: docs/pixloader_agent_spec.json
+- description: structured, machine-oriented Pixloader specification covering configuration, data stores, components, maintenance workflows, APIs, logging, and edge cases
+- created_at: 2025-11-06
