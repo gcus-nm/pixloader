@@ -286,6 +286,83 @@ def create_viewer_app(
                 )
                 conn.commit()
 
+    def _ensure_summary_table() -> None:
+        with _connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS illustration_summary (
+                    illust_id INTEGER PRIMARY KEY,
+                    illust_title TEXT,
+                    artist_name TEXT,
+                    cover_path TEXT,
+                    page_count INTEGER DEFAULT 0,
+                    bookmark_count INTEGER DEFAULT 0,
+                    view_count INTEGER DEFAULT 0,
+                    is_r18 INTEGER DEFAULT 0,
+                    is_ai INTEGER DEFAULT 0,
+                    tags TEXT DEFAULT '[]',
+                    last_downloaded_at TEXT,
+                    create_date TEXT,
+                    bookmarked_at TEXT
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_downloaded_at ON illustration_summary(last_downloaded_at)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_artist_name ON illustration_summary(artist_name)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_bookmark_count ON illustration_summary(bookmark_count)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_view_count ON illustration_summary(view_count)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_r18_ai ON illustration_summary(is_r18, is_ai)"
+            )
+            summary_count = conn.execute(
+                "SELECT COUNT(*) FROM illustration_summary"
+            ).fetchone()[0]
+            if summary_count == 0:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO illustration_summary (
+                        illust_id,
+                        illust_title,
+                        artist_name,
+                        cover_path,
+                        page_count,
+                        bookmark_count,
+                        view_count,
+                        is_r18,
+                        is_ai,
+                        tags,
+                        last_downloaded_at,
+                        create_date,
+                        bookmarked_at
+                    )
+                    SELECT
+                        illust_id,
+                        MAX(illust_title),
+                        MAX(artist_name),
+                        MIN(file_path),
+                        COUNT(*) AS page_count,
+                        MAX(COALESCE(bookmark_count, 0)),
+                        MAX(COALESCE(view_count, 0)),
+                        MAX(COALESCE(is_r18, 0)),
+                        MAX(COALESCE(is_ai, 0)),
+                        MAX(tags),
+                        MAX(downloaded_at),
+                        MAX(create_date),
+                        MAX(bookmarked_at)
+                    FROM downloads
+                    GROUP BY illust_id
+                    """
+                )
+            conn.commit()
+
     def _get_default_axis_id() -> int:
         with _connect() as conn:
             row = conn.execute(
@@ -402,6 +479,7 @@ def create_viewer_app(
         ]
 
     _ensure_rating_tables()
+    _ensure_summary_table()
     default_axis_id = _get_default_axis_id()
 
 
@@ -578,13 +656,13 @@ def create_viewer_app(
             f"axis_{axis.axis_id}": f"axis_{axis.axis_id}_score" for axis in rating_axes
         }
         base_sort_columns = {
-            "downloaded_at": "last_downloaded_at",
-            "bookmarks": "bookmark_count",
-            "views": "view_count",
-            "title": "title",
+            "downloaded_at": "s.last_downloaded_at",
+            "bookmarks": "s.bookmark_count",
+            "views": "s.view_count",
+            "title": "s.illust_title",
             "rating": "rating",
-            "posted_at": "posted_at",
-            "bookmarked_at": "bookmarked_at",
+            "posted_at": "s.create_date",
+            "bookmarked_at": "s.bookmarked_at",
             "random": "RANDOM()",
         }
         sort_column = axis_sort_columns.get(sort, base_sort_columns.get(sort, "last_downloaded_at"))
@@ -608,27 +686,27 @@ def create_viewer_app(
                 normalized_term = term.lower()
                 # Match each term against both Pixiv and custom tags (partial, case-insensitive).
                 like_term = f"%{normalized_term}%"
-                term_clauses.append("(LOWER(COALESCE(d.tags, '')) LIKE ? OR LOWER(COALESCE(m.custom_tags, '')) LIKE ?)")
+                term_clauses.append("(LOWER(COALESCE(s.tags, '')) LIKE ? OR LOWER(COALESCE(m.custom_tags, '')) LIKE ?)")
                 params.extend((like_term, like_term))
             if term_clauses:
                 where.append('(' + ' OR '.join(term_clauses) + ')')
         if artist:
-            where.append("d.artist_name LIKE ?")
+            where.append("s.artist_name LIKE ?")
             params.append(f"%{artist}%")
         if title:
-            where.append("d.illust_title LIKE ?")
+            where.append("s.illust_title LIKE ?")
             params.append(f"%{title}%")
         if r18 == "only":
-            where.append("d.is_r18 = 1")
+            where.append("s.is_r18 = 1")
         elif r18 == "exclude":
-            where.append("(d.is_r18 IS NULL OR d.is_r18 = 0)")
+            where.append("(s.is_r18 IS NULL OR s.is_r18 = 0)")
         if ai == "only":
-            where.append("d.is_ai = 1")
+            where.append("s.is_ai = 1")
         elif ai == "exclude":
-            where.append("(d.is_ai IS NULL OR d.is_ai = 0)")
+            where.append("(s.is_ai IS NULL OR s.is_ai = 0)")
 
         if not include_unknown:
-            where.append("TRIM(COALESCE(d.illust_title, '')) <> '' AND TRIM(COALESCE(d.artist_name, '')) <> ''")
+            where.append("TRIM(COALESCE(s.illust_title, '')) <> '' AND TRIM(COALESCE(s.artist_name, '')) <> ''")
 
         where_sql = " AND ".join(where)
         having_clauses: list[str] = []
@@ -654,12 +732,12 @@ def create_viewer_app(
                 f"""
                 SELECT COUNT(*)
                 FROM (
-                    SELECT d.illust_id
-                    FROM downloads d
-                    LEFT JOIN illustration_meta m ON m.illust_id = d.illust_id
-                    LEFT JOIN illustration_ratings ir ON ir.illust_id = d.illust_id
+                    SELECT s.illust_id
+                    FROM illustration_summary s
+                    LEFT JOIN illustration_meta m ON m.illust_id = s.illust_id
+                    LEFT JOIN illustration_ratings ir ON ir.illust_id = s.illust_id
                     WHERE {where_sql}
-                    GROUP BY d.illust_id
+                    GROUP BY s.illust_id
                     {having_sql}
                 ) AS counted
                 """,
@@ -670,27 +748,27 @@ def create_viewer_app(
             rows = conn.execute(
                 f"""
                 SELECT
-                    d.illust_id,
-                    MAX(d.illust_title) AS title,
-                    MAX(d.artist_name) AS artist,
-                    MIN(d.file_path) AS cover_path,
-                    COUNT(DISTINCT d.page) AS page_count,
-                    MAX(COALESCE(d.bookmark_count, 0)) AS bookmark_count,
-                    MAX(COALESCE(d.view_count, 0)) AS view_count,
-                    MAX(COALESCE(d.is_r18, 0)) AS is_r18,
-                    MAX(COALESCE(d.is_ai, 0)) AS is_ai,
-                    MAX(d.tags) AS tags,
-                    MAX(d.downloaded_at) AS last_downloaded_at,
-                    MAX(d.create_date) AS posted_at,
-                    MAX(d.bookmarked_at) AS bookmarked_at,
+                    s.illust_id,
+                    s.illust_title AS title,
+                    s.artist_name AS artist,
+                    s.cover_path AS cover_path,
+                    s.page_count AS page_count,
+                    COALESCE(s.bookmark_count, 0) AS bookmark_count,
+                    COALESCE(s.view_count, 0) AS view_count,
+                    COALESCE(s.is_r18, 0) AS is_r18,
+                    COALESCE(s.is_ai, 0) AS is_ai,
+                    COALESCE(s.tags, '[]') AS tags,
+                    s.last_downloaded_at AS last_downloaded_at,
+                    s.create_date AS posted_at,
+                    s.bookmarked_at AS bookmarked_at,
                     COALESCE(MAX(m.custom_tags), '[]') AS custom_tags,
                     COALESCE(MAX(m.rating), 0) AS rating
                     {axis_select_sql}
-                FROM downloads d
-                LEFT JOIN illustration_meta m ON m.illust_id = d.illust_id
-                LEFT JOIN illustration_ratings ir ON ir.illust_id = d.illust_id
+                FROM illustration_summary s
+                LEFT JOIN illustration_meta m ON m.illust_id = s.illust_id
+                LEFT JOIN illustration_ratings ir ON ir.illust_id = s.illust_id
                 WHERE {where_sql}
-                GROUP BY d.illust_id
+                GROUP BY s.illust_id
                 {having_sql}
                 ORDER BY {order_clause}
                 LIMIT ? OFFSET ?
