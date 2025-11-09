@@ -16,6 +16,7 @@ from typing import Any, Sequence
 from .logging_utils import LogBuffer
 from .config import Config
 from .maintenance import fetch_recent_batch, verify_bookmarks, verify_files
+from .storage import DownloadRegistry
 from .sync_controller import SyncController
 
 
@@ -126,6 +127,8 @@ def create_viewer_app(
     app = Flask(__name__, template_folder=str(template_dir))
     download_dir = download_dir.resolve()
     database_path = database_path.resolve()
+    with DownloadRegistry(database_path):
+        pass
     per_page_options = [10, 25, 50, 100, 150, 200, 300, 500]
 
 
@@ -146,7 +149,7 @@ def create_viewer_app(
         {"value": "eq", "label": "等しい (=)"},
         {"value": "le", "label": "以下 (≦)"},
     ]
-    rating_display_modes = {"stars", "circles", "squares", "numeric", "bar"}
+    rating_display_modes = {"stars", "circles", "squares", "numeric", "bar", "hearts", "counter"}
 
     maintenance_lock = threading.Lock()
     maintenance_state = {
