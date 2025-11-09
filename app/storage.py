@@ -5,6 +5,7 @@ import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
+from typing import Iterator
 
 
 class DownloadRegistry:
@@ -42,6 +43,25 @@ class DownloadRegistry:
                 illust_id INTEGER PRIMARY KEY,
                 custom_tags TEXT DEFAULT '[]',
                 rating INTEGER DEFAULT 0
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS illustration_summary (
+                illust_id INTEGER PRIMARY KEY,
+                illust_title TEXT,
+                artist_name TEXT,
+                cover_path TEXT,
+                page_count INTEGER DEFAULT 0,
+                bookmark_count INTEGER DEFAULT 0,
+                view_count INTEGER DEFAULT 0,
+                is_r18 INTEGER DEFAULT 0,
+                is_ai INTEGER DEFAULT 0,
+                tags TEXT DEFAULT '[]',
+                last_downloaded_at TEXT,
+                create_date TEXT,
+                bookmarked_at TEXT
             )
             """
         )
@@ -88,6 +108,80 @@ class DownloadRegistry:
                 self._conn.execute(stmt)
             if alterations or meta_altered:
                 self._conn.commit()
+
+            # Ensure indexes for viewer filtering/sorting columns to avoid full table scans.
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_downloads_downloaded_at ON downloads(last_downloaded_at)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_downloads_artist_name ON downloads(artist_name)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_downloads_bookmark_count ON downloads(bookmark_count)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_downloads_view_count ON downloads(view_count)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_downloads_r18_ai ON downloads(is_r18, is_ai)"
+            )
+
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_downloaded_at ON illustration_summary(last_downloaded_at)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_artist_name ON illustration_summary(artist_name)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_bookmark_count ON illustration_summary(bookmark_count)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_view_count ON illustration_summary(view_count)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_summary_r18_ai ON illustration_summary(is_r18, is_ai)"
+            )
+
+            summary_count = self._conn.execute(
+                "SELECT COUNT(*) FROM illustration_summary"
+            ).fetchone()[0]
+            if summary_count == 0:
+                self._conn.execute(
+                    """
+                    INSERT OR REPLACE INTO illustration_summary (
+                        illust_id,
+                        illust_title,
+                        artist_name,
+                        cover_path,
+                        page_count,
+                        bookmark_count,
+                        view_count,
+                        is_r18,
+                        is_ai,
+                        tags,
+                        last_downloaded_at,
+                        create_date,
+                        bookmarked_at
+                    )
+                    SELECT
+                        illust_id,
+                        MAX(illust_title),
+                        MAX(artist_name),
+                        MIN(file_path),
+                        COUNT(*) AS page_count,
+                        MAX(COALESCE(bookmark_count, 0)),
+                        MAX(COALESCE(view_count, 0)),
+                        MAX(COALESCE(is_r18, 0)),
+                        MAX(COALESCE(is_ai, 0)),
+                        MAX(tags),
+                        MAX(downloaded_at),
+                        MAX(create_date),
+                        MAX(bookmarked_at)
+                    FROM downloads
+                    GROUP BY illust_id
+                    """
+                )
+            self._conn.commit()
 
     def is_downloaded(self, illust_id: int, page: int) -> bool:
         with self._lock:
@@ -152,7 +246,7 @@ class DownloadRegistry:
                     is_ai=excluded.is_ai,
                     create_date=excluded.create_date,
                     bookmarked_at=excluded.bookmarked_at,
-        metadata_synced=excluded.metadata_synced
+                    metadata_synced=excluded.metadata_synced
                 """,
                 (
                     illust_id,
@@ -169,7 +263,92 @@ class DownloadRegistry:
                     bookmark_value,
                 ),
             )
+            self._refresh_summary(
+                illust_id=illust_id,
+                illust_title=illust_title,
+                artist_name=artist_name,
+                tags_json=tags_json,
+                bookmark_count=bookmark_count,
+                view_count=view_count,
+                is_r18_val=is_r18_val,
+                is_ai_val=is_ai_val,
+                create_date=create_date,
+                bookmarked_at=bookmark_value,
+            )
             self._conn.commit()
+
+    def _refresh_summary(
+        self,
+        illust_id: int,
+        illust_title: str | None,
+        artist_name: str | None,
+        tags_json: str,
+        bookmark_count: int,
+        view_count: int,
+        is_r18_val: int | None,
+        is_ai_val: int | None,
+        create_date: str | None,
+        bookmarked_at: str | None,
+    ) -> None:
+        page_count = self._conn.execute(
+            "SELECT COUNT(*) FROM downloads WHERE illust_id = ?", (illust_id,)
+        ).fetchone()[0]
+        cover_row = self._conn.execute(
+            "SELECT file_path FROM downloads WHERE illust_id = ? ORDER BY page ASC LIMIT 1",
+            (illust_id,),
+        ).fetchone()
+        cover_path = cover_row["file_path"] if cover_row else None
+        last_downloaded_at = self._conn.execute(
+            "SELECT MAX(downloaded_at) FROM downloads WHERE illust_id = ?", (illust_id,)
+        ).fetchone()[0]
+        self._conn.execute(
+            """
+            INSERT INTO illustration_summary (
+                illust_id,
+                illust_title,
+                artist_name,
+                cover_path,
+                page_count,
+                bookmark_count,
+                view_count,
+                is_r18,
+                is_ai,
+                tags,
+                last_downloaded_at,
+                create_date,
+                bookmarked_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(illust_id) DO UPDATE SET
+                illust_title=COALESCE(excluded.illust_title, illustration_summary.illust_title),
+                artist_name=COALESCE(excluded.artist_name, illustration_summary.artist_name),
+                cover_path=COALESCE(excluded.cover_path, illustration_summary.cover_path),
+                page_count=excluded.page_count,
+                bookmark_count=excluded.bookmark_count,
+                view_count=excluded.view_count,
+                is_r18=COALESCE(excluded.is_r18, illustration_summary.is_r18),
+                is_ai=COALESCE(excluded.is_ai, illustration_summary.is_ai),
+                tags=COALESCE(excluded.tags, illustration_summary.tags),
+                last_downloaded_at=COALESCE(excluded.last_downloaded_at, illustration_summary.last_downloaded_at),
+                create_date=COALESCE(excluded.create_date, illustration_summary.create_date),
+                bookmarked_at=COALESCE(excluded.bookmarked_at, illustration_summary.bookmarked_at)
+            """,
+            (
+                illust_id,
+                illust_title,
+                artist_name,
+                cover_path,
+                page_count,
+                bookmark_count,
+                view_count,
+                0 if is_r18_val is None else is_r18_val,
+                0 if is_ai_val is None else is_ai_val,
+                tags_json,
+                last_downloaded_at,
+                create_date,
+                bookmarked_at,
+            ),
+        )
 
     def load_downloaded_keys(self) -> set[tuple[int, int]]:
         with self._lock:
