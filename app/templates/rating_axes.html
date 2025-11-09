@@ -144,6 +144,15 @@
     </p>
   </header>
   <main>
+    {% set display_mode_labels = {
+      'stars': '星 (★)',
+      'hearts': 'ハート (♡)',
+      'circles': '丸 (●)',
+      'squares': '四角 (■)',
+      'numeric': '数値表示',
+      'bar': 'ゲージ',
+      'counter': 'カウンター'
+    } %}
     {% if message %}
     <div class="message success">{{ message }}</div>
     {% endif %}
@@ -165,13 +174,7 @@
         表示方法
         <select name="display_mode">
           {% for mode in display_modes %}
-          <option value="{{ mode }}">{{ {
-            'stars': '星 (★)',
-            'circles': '丸 (●)',
-            'squares': '四角 (■)',
-            'numeric': '数値表示',
-            'bar': 'ゲージ'
-          }[mode] }}</option>
+          <option value="{{ mode }}">{{ display_mode_labels[mode] }}</option>
           {% endfor %}
         </select>
       </label>
@@ -203,13 +206,7 @@
           <td>
             <select form="{{ form_id }}" name="display_mode">
               {% for mode in display_modes %}
-              <option value="{{ mode }}" {{ 'selected' if axis.display_mode == mode else '' }}>{{ {
-                'stars': '星 (★)',
-                'circles': '丸 (●)',
-                'squares': '四角 (■)',
-                'numeric': '数値表示',
-                'bar': 'ゲージ'
-              }[mode] }}</option>
+              <option value="{{ mode }}" {{ 'selected' if axis.display_mode == mode else '' }}>{{ display_mode_labels[mode] }}</option>
               {% endfor %}
             </select>
           </td>

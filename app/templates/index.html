@@ -757,6 +757,30 @@
       color: #ffd861;
       text-shadow: 0 0 8px rgba(255, 216, 97, 0.45);
     }
+    .rating-badge.mode-hearts .rating-output {
+      letter-spacing: 0.16em;
+      color: #ff8ecb;
+      text-shadow: 0 0 8px rgba(255, 142, 203, 0.45);
+      font-size: 1rem;
+    }
+    .rating-badge.mode-hearts {
+      font-size: 1rem;
+      padding: 0.3rem 0.9rem;
+    }
+    .rating-badge.mode-hearts {
+      border-color: rgba(255, 137, 201, 0.45);
+      background: rgba(255, 138, 203, 0.12);
+      color: #ffd4f0;
+    }
+    .rating-badge.mode-counter .rating-output {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.08em;
+      color: #ffcc8c;
+    }
+    .rating-badge.mode-counter {
+      border-color: rgba(255, 188, 145, 0.4);
+      background: rgba(255, 255, 255, 0.08);
+    }
     .rating-badge.mode-circles .rating-output { letter-spacing: 0.14em; }
     .rating-badge.mode-squares .rating-output { letter-spacing: 0.1em; }
     .rating-badge.mode-numeric .rating-output { letter-spacing: 0.05em; }
@@ -1269,28 +1293,43 @@
       const ratingAxisMap = new Map(ratingAxesData.map(axis => [Number(axis.axis_id), axis]));
       const defaultAxisId = Number(body.dataset.defaultAxis || '0');
       const defaultAxisMax = Number(body.dataset.defaultMax || '5');
+      const quickRateModes = new Set(['stars', 'hearts', 'counter']);
 
       function parseAxisScores(editor) {
         if (!editor) {
           return new Map();
         }
-        try {
-          const raw = editor.dataset.axisScores || '{}';
-          const parsed = JSON.parse(raw);
-          const result = new Map();
-          if (parsed && typeof parsed === 'object') {
-            Object.entries(parsed).forEach(([key, value]) => {
-              const axisId = Number(key);
-              if (Number.isFinite(axisId)) {
-                result.set(axisId, Number(value) || 0);
-              }
-            });
-          }
-          return result;
-        } catch (error) {
-          console.warn('Failed to parse axis scores', error);
+        const raw = (editor.dataset.axisScores || '{}').trim();
+        if (!raw) {
           return new Map();
         }
+        const looksLikeJson = raw.startsWith('{') || raw.startsWith('[');
+        if (!looksLikeJson) {
+          return new Map();
+        }
+        const attemptParse = stringValue => {
+          try {
+            return JSON.parse(stringValue);
+          } catch (error) {
+            return null;
+          }
+        };
+        let parsed = attemptParse(raw);
+        if (parsed === null && raw.includes("'")) {
+          const normalized = raw.replace(/'/g, '"');
+          parsed = attemptParse(normalized);
+        }
+        if (!parsed || typeof parsed !== 'object') {
+          return new Map();
+        }
+        const result = new Map();
+        Object.entries(parsed).forEach(([key, value]) => {
+          const axisId = Number(key);
+          if (Number.isFinite(axisId)) {
+            result.set(axisId, Number(value) || 0);
+          }
+        });
+        return result;
       }
 
       function ensureInlineAxes(editor) {
@@ -1820,9 +1859,10 @@
         const gauge = badge.querySelector('.rating-gauge');
         const fill = badge.querySelector('.rating-gauge-fill');
         const rawScore = Number(badge.dataset.score ?? '0');
+        const mode = (badge.dataset.displayMode || 'stars').toLowerCase();
         const rawMax = Number(badge.dataset.max ?? '5');
-        const max = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 1;
-        const mode = badge.dataset.displayMode || 'stars';
+        const fallbackMax = mode === 'counter' ? 9999 : 1;
+        const max = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : fallbackMax;
         const safeScore = Number.isFinite(rawScore) ? rawScore : 0;
         const score = Math.max(0, Math.min(max, Math.round(safeScore)));
         const ratio = Math.max(0, Math.min(1, score / max));
@@ -1832,13 +1872,13 @@
         if (gauge) {
           gauge.style.display = mode === 'bar' ? 'block' : 'none';
         }
-        const modeClasses = ['stars', 'circles', 'squares', 'numeric', 'bar'];
+        const modeClasses = ['stars', 'hearts', 'circles', 'squares', 'numeric', 'bar', 'counter'];
         modeClasses.forEach(name => {
           badge.classList.toggle(`mode-${name}`, mode === name);
         });
-        const isStarMode = mode === 'stars';
-        badge.classList.toggle('quick-rate', isStarMode);
-        if (!isStarMode) {
+        const quickRateEnabled = quickRateModes.has(mode);
+        badge.classList.toggle('quick-rate', quickRateEnabled);
+        if (!quickRateEnabled) {
           badge.classList.remove('is-pending');
         }
         if (!output) {
@@ -1849,6 +1889,11 @@
           case 'stars': {
             const empty = Math.max(0, max - score);
             text = '★'.repeat(score) + '☆'.repeat(empty);
+            break;
+          }
+          case 'hearts': {
+            const empty = Math.max(0, max - score);
+            text = '♥'.repeat(score) + '♡'.repeat(empty);
             break;
           }
           case 'circles': {
@@ -1863,6 +1908,9 @@
           }
           case 'bar':
             text = `${Math.round(ratio * 100)}%`;
+            break;
+          case 'counter':
+            text = `${score}`;
             break;
           case 'numeric':
           default:
@@ -2035,22 +2083,38 @@
             return;
           }
           const mode = (badge.dataset.displayMode || '').toLowerCase();
-          if (mode !== 'stars') {
+          if (!quickRateModes.has(mode)) {
             return;
           }
           badge.dataset.quickRateBound = '1';
           badge.addEventListener('click', event => {
             const currentMode = (badge.dataset.displayMode || '').toLowerCase();
-            if (currentMode !== 'stars') {
+            if (!quickRateModes.has(currentMode)) {
               return;
             }
             const illustId = Number(badge.dataset.illustId);
             const axisId = Number(badge.dataset.axisId);
-            let max = Number(badge.dataset.max ?? defaultAxisMax ?? 5);
-            if (!Number.isFinite(max) || max <= 0) {
-              max = 5;
-            }
             if (!Number.isFinite(illustId) || !Number.isFinite(axisId)) {
+              return;
+            }
+            let max = Number(badge.dataset.max ?? defaultAxisMax ?? 5);
+            const fallbackMax = currentMode === 'counter' ? 9999 : 5;
+            if (!Number.isFinite(max) || max <= 0) {
+              max = fallbackMax;
+            }
+            const currentScore = Number(badge.dataset.score || '0');
+            if (currentMode === 'counter') {
+              let nextScore = Number.isFinite(currentScore) ? currentScore : 0;
+              if (event.shiftKey) {
+                nextScore = 0;
+              } else {
+                nextScore += 1;
+              }
+              nextScore = Math.max(0, Math.min(max, nextScore));
+              if (!Number.isFinite(nextScore) || (!event.shiftKey && nextScore === currentScore)) {
+                return;
+              }
+              submitQuickRating(illustId, axisId, nextScore, currentScore);
               return;
             }
             const output = badge.querySelector('.rating-output');
@@ -2079,7 +2143,6 @@
               nextScore = 0;
             }
             nextScore = Math.max(0, Math.min(max, nextScore));
-            const currentScore = Number(badge.dataset.score || '0');
             if (!Number.isFinite(nextScore) || (!event.shiftKey && nextScore === currentScore)) {
               return;
             }

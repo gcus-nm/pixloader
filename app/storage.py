@@ -111,7 +111,7 @@ class DownloadRegistry:
 
             # Ensure indexes for viewer filtering/sorting columns to avoid full table scans.
             self._conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_downloads_downloaded_at ON downloads(last_downloaded_at)"
+                "CREATE INDEX IF NOT EXISTS idx_downloads_downloaded_at ON downloads(downloaded_at)"
             )
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_downloads_artist_name ON downloads(artist_name)"
