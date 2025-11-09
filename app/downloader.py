@@ -32,8 +32,10 @@ class DownloadManager:
         self._registry = registry
         self._download_root = download_root
         self._max_workers = max_workers
+        self._downloaded_keys: set[tuple[int, int]] = set()
 
     def run(self) -> None:
+        self._downloaded_keys = self._registry.load_downloaded_keys()
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
             pending: set[Future[DownloadResult | None]] = set()
             for illust in self._service.iter_bookmarks():
@@ -44,7 +46,8 @@ class DownloadManager:
                 for task in tasks:
                     target_dir = self._download_root / task.directory_name
                     target_path = target_dir / task.filename
-                    record_exists = self._registry.is_downloaded(task.illust_id, task.page_index)
+                    task_key = (task.illust_id, task.page_index)
+                    record_exists = task_key in self._downloaded_keys
                     file_exists = target_path.exists()
 
                     if record_exists and file_exists:
@@ -103,6 +106,7 @@ class DownloadManager:
                 result.task.page_index,
                 result.path,
             )
+            self._downloaded_keys.add((result.task.illust_id, result.task.page_index))
 
     def _download_single(self, task: ImageTask) -> DownloadResult | None:
         target_dir = self._download_root / task.directory_name

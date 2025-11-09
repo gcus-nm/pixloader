@@ -152,7 +152,7 @@ class DownloadRegistry:
                     is_ai=excluded.is_ai,
                     create_date=excluded.create_date,
                     bookmarked_at=excluded.bookmarked_at,
-                    metadata_synced=excluded.metadata_synced
+        metadata_synced=excluded.metadata_synced
                 """,
                 (
                     illust_id,
@@ -170,6 +170,13 @@ class DownloadRegistry:
                 ),
             )
             self._conn.commit()
+
+    def load_downloaded_keys(self) -> set[tuple[int, int]]:
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT illust_id, page FROM downloads"
+            )
+            return {(row["illust_id"], row["page"]) for row in cursor.fetchall()}
 
     def illustrations_missing_metadata(self, limit: int = 50) -> list[int]:
         with self._lock:
