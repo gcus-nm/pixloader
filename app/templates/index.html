@@ -506,9 +506,9 @@
       position: absolute;
       left: 0;
       right: 0;
-      top: 0;
-      padding: 1rem 1.1rem 0.9rem;
-      background: linear-gradient(180deg, rgba(6, 12, 24, 0.9), rgba(6, 12, 24, 0.45) 60%, transparent);
+      bottom: 0;
+      padding: 1rem 1.1rem 1.1rem;
+      background: linear-gradient(0deg, rgba(6, 12, 24, 0.92), rgba(6, 12, 24, 0.55) 45%, transparent);
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
@@ -525,6 +525,7 @@
       font-size: 0.95rem;
       font-weight: 600;
       line-height: 1.2;
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.85);
     }
     .overlay-flags {
       display: flex;
@@ -546,6 +547,7 @@
       flex-wrap: wrap;
       font-size: 0.75rem;
       color: rgba(220, 230, 255, 0.85);
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.85);
     }
     .overlay-link {
       border: none;
@@ -556,15 +558,44 @@
       pointer-events: auto;
       font: inherit;
       padding: 0;
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.85);
+    }
+    .overlay-tag-toggle {
+      align-self: flex-start;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(220, 230, 255, 0.95);
+      font-size: 0.75rem;
+      padding: 0.3rem 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.15s ease;
+      pointer-events: auto;
+    }
+    .overlay-tag-toggle:hover {
+      background: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
     }
     .overlay-tags {
-      display: flex;
+      display: none;
       flex-wrap: wrap;
       gap: 0.35rem;
       font-size: 0.7rem;
       max-height: 6rem;
       overflow-y: auto;
       padding-right: 0.25rem;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+    .overlay-tags::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .overlay-tags.is-open {
+      display: flex;
+      opacity: 1;
     }
     .overlay-tag {
       border: none;
@@ -852,21 +883,6 @@
     }
     .tag-expand:hover {
       background: rgba(255, 255, 255, 0.16);
-    }
-    .overlay-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      font-size: 0.7rem;
-      max-height: 6rem;
-      overflow-y: auto;
-      padding-right: 0.25rem;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-    .overlay-tags::-webkit-scrollbar {
-      width: 0;
-      height: 0;
     }
     .tag-button {
       border: none;
@@ -2231,6 +2247,29 @@
         }
       }
 
+      function initializeOverlayTagToggles() {
+        document.querySelectorAll('[data-toggle-overlay-tags]').forEach(button => {
+          const info = button.closest('[data-info]');
+          const tags = info ? info.querySelector('[data-overlay-tags]') : null;
+          if (!tags) {
+            button.hidden = true;
+            return;
+          }
+          const showLabel = button.dataset.showLabel || 'タグを表示';
+          const hideLabel = button.dataset.hideLabel || 'タグを隠す';
+          const setVisible = (visible) => {
+            tags.classList.toggle('is-open', visible);
+            tags.setAttribute('aria-hidden', visible ? 'false' : 'true');
+            button.setAttribute('aria-expanded', visible ? 'true' : 'false');
+            button.textContent = visible ? hideLabel : showLabel;
+          };
+          button.addEventListener('click', () => {
+            setVisible(!tags.classList.contains('is-open'));
+          });
+          setVisible(false);
+        });
+      }
+
       function initializeTagPanels() {
         document.querySelectorAll('[data-tags]').forEach(container => {
           if (!container.dataset.tagCount) {
@@ -2462,6 +2501,7 @@
       }
       renderAllBadges();
       bindQuickRatingBadges();
+      initializeOverlayTagToggles();
       initializeTagPanels();
       bindInlineEditors();
     })();
