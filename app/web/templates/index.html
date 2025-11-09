@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
@@ -7,15 +7,12 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #060f16;
-      --panel: rgba(18, 28, 46, 0.92);
-      --panel-hover: rgba(24, 38, 62, 0.98);
-      --border: rgba(255, 255, 255, 0.12);
-      --muted: rgba(224, 235, 255, 0.72);
-      --accent: #5b7dff;
-      --accent-strong: #8b5cff;
-      --badge-r18: rgba(255, 116, 156, 0.28);
-      --badge-ai: rgba(116, 255, 210, 0.24);
+      --bg: #050b13;
+      --panel: rgba(18, 28, 46, 0.95);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --chip-bg: rgba(105, 140, 220, 0.18);
+      --chip-border: rgba(105, 140, 220, 0.4);
+      --danger: rgba(255, 120, 140, 0.2);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
     }
     * { box-sizing: border-box; }
@@ -25,1220 +22,331 @@
       background: var(--bg);
       color: #f3f7ff;
     }
-    body[data-modal-open] { overflow: hidden; }
     a { color: inherit; }
     .viewer-shell {
       display: grid;
-      grid-template-columns: minmax(260px, 320px) 1fr;
-      gap: 0;
+      grid-template-columns: minmax(280px, 320px) 1fr;
       min-height: 100vh;
     }
+    body[data-sidebar="hidden"] .viewer-shell { grid-template-columns: 1fr; }
+    body[data-sidebar="hidden"] .sidebar-panel { display: none; }
+    body[data-sidebar="hidden"] .viewer-main { padding-left: min(5vw, 32px); }
     .sidebar-panel {
       position: sticky;
       top: 0;
       height: 100vh;
-      z-index: 20;
       display: flex;
       flex-direction: column;
-      gap: 1.4rem;
-      padding: clamp(1.6rem, 4vw, 2.6rem) clamp(1.4rem, 5vw, 2.8rem);
-      background: rgba(6, 14, 28, 0.95);
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(14px);
+      gap: 1.2rem;
+      padding: 1.6rem 1.8rem;
+      background: var(--panel);
+      border-right: 1px solid var(--panel-border);
       overflow-y: auto;
     }
-    body[data-sidebar="hidden"] .sidebar-panel {
-      visibility: hidden;
-      pointer-events: none;
-      opacity: 0;
-    }
-    body[data-sidebar="hidden"] .viewer-shell {
-      grid-template-columns: 0 1fr;
-    }
-    .sidebar-restore {
-      position: fixed;
-      top: 1.2rem;
-      left: 1.2rem;
-      z-index: 30;
-      display: none;
-      padding: 0.5rem 1.4rem;
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      box-shadow: 0 14px 28px rgba(6, 12, 24, 0.4);
-      font-weight: 600;
-    }
-    body[data-sidebar="hidden"] .sidebar-restore {
-      display: inline-flex;
-    }
-    .sidebar-top {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    .sidebar-top h1 {
-      margin: 0;
-      font-size: clamp(1.8rem, 4vw, 2.4rem);
-      font-weight: 700;
-    }
-    .header-actions {
-      margin-left: auto;
-      display: flex;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
+    .sidebar-top h1 { margin: 0; font-size: 1.4rem; }
+    .sidebar-sub { margin: 0; color: rgba(230, 238, 255, 0.7); font-size: 0.9rem; }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     button,
     .link-button {
       border: none;
       border-radius: 999px;
-      padding: 0.6rem 1.2rem;
+      padding: 0.55rem 1.1rem;
       font-weight: 600;
       cursor: pointer;
+      background: linear-gradient(135deg, #5b7dff, #a35dff);
       color: inherit;
-      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
       text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
     }
     button.secondary,
-    .link-button.secondary {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-    }
-    button:hover,
-    .link-button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 16px 32px rgba(36, 58, 120, 0.32);
-    }
-    .status-row {
-      display: flex;
-      gap: 0.8rem;
-      flex-wrap: wrap;
-      align-items: center;
-    }
+    .link-button.secondary { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.25); }
+    button.subtle { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); }
+    .status-row { display: flex; flex-direction: column; gap: 0.5rem; }
     .status-chip {
-      padding: 0.55rem 1rem;
+      padding: 0.45rem 0.9rem;
       border-radius: 999px;
-      background: rgba(110, 150, 255, 0.18);
-      border: 1px solid rgba(110, 150, 255, 0.35);
-      font-size: 0.9rem;
-      color: rgba(210, 222, 255, 0.92);
+      background: var(--chip-bg);
+      border: 1px solid var(--chip-border);
+      font-size: 0.85rem;
     }
     .maintenance-panel {
+      background: rgba(12, 20, 34, 0.95);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 1.2rem 1.3rem;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
-      padding: 1rem 1.2rem;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(12, 20, 38, 0.9);
+      gap: 0.7rem;
     }
-    .maintenance-panel .maintenance-header {
+    .maintenance-header { display: flex; justify-content: space-between; align-items: baseline; gap: 0.8rem; }
+    .maintenance-header h2 { margin: 0; font-size: 1.05rem; }
+    .maintenance-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .maintenance-hint { margin: 0; font-size: 0.85rem; color: rgba(220, 228, 245, 0.7); }
+    .recent-fetch { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .recent-fetch input { width: 80px; padding: 0.4rem 0.6rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: inherit; text-align: center; }
+    .viewer-main {
+      padding: 1.8rem 2.2rem;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.8rem;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 1.5rem;
     }
-    .maintenance-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-    }
-    .maintenance-actions button {
-      flex: 1 1 160px;
-    }
-    .maintenance-panel h2 {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #f3f7ff;
-    }
-    .maintenance-status {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-      white-space: pre-line;
-    }
-    .maintenance-hint {
-      margin: 0;
-      font-size: 0.75rem;
-      color: rgba(200, 210, 230, 0.7);
-    }
+    .results-summary { display: flex; flex-wrap: wrap; gap: 0.8rem; font-size: 0.92rem; color: rgba(220,230,255,0.85); }
+    .filters-panel { background: rgba(12, 20, 34, 0.92); border: 1px solid var(--panel-border); border-radius: 18px; padding: 1.2rem 1.4rem; }
     form.filters {
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 1rem;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      align-items: end;
     }
-    form.filters label {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    form.filters label.field-disabled {
-      opacity: 0.6;
-    }
-    form.filters label.field-disabled select {
-      cursor: not-allowed;
-    }
+    form.filters label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.88rem; }
     form.filters input,
-    form.filters select {
-      padding: 0.6rem 0.75rem;
+    form.filters select,
+    form.filters textarea {
+      padding: 0.55rem 0.65rem;
       border-radius: 10px;
-      border: 1px solid var(--border);
-      background: rgba(18, 30, 48, 0.92);
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(8,14,26,0.85);
       color: inherit;
       font: inherit;
     }
-    form.filters {
-      position: relative;
-      padding-bottom: 3.8rem;
-    }
-    .button-cell {
-      display: flex;
-      gap: 0.6rem;
-      position: sticky;
-      bottom: 0;
-      padding: 0.75rem 0;
-      margin-top: 0.8rem;
-      background: rgba(6, 14, 28, 0.95);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      z-index: 5;
-    }
-    .modal-backdrop,
-    .log-modal {
-      display: none;
-    }
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(4, 10, 24, 0.68);
-      backdrop-filter: blur(14px);
-      z-index: 80;
-      opacity: 0;
-      transition: opacity 0.18s ease;
-    }
-    .log-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 90;
-      align-items: center;
-      justify-content: center;
-      padding: clamp(1.6rem, 6vw, 3.2rem);
-      opacity: 0;
-      pointer-events: none;
-      transform: scale(0.98);
-      transition: opacity 0.18s ease, transform 0.18s ease;
-    }
-    .modal-backdrop.active {
-      display: block;
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .log-modal.active {
-      display: flex;
-      opacity: 1;
-      pointer-events: auto;
-      transform: scale(1);
-    }
-    .log-modal__dialog {
-      width: min(880px, 96vw);
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      padding: clamp(1.4rem, 3vw, 2rem);
-      background: rgba(10, 18, 32, 0.94);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 24px;
-      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.45);
-    }
-    .log-modal__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    .log-modal__title {
-      margin: 0;
-      font-size: 1.4rem;
-      font-weight: 600;
-    }
-    .log-modal__actions {
-      display: flex;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
-        main {
-      padding: clamp(2.4rem, 6vw, 3.6rem) clamp(1.4rem, 6vw, 4.2rem) clamp(3rem, 7vw, 4.4rem);
-    }
-    .view-panel { display: none; }
-    body[data-display-mode="text"] .view-panel[data-panel="text"] { display: block; }
-    body[data-display-mode="text"] .view-panel[data-panel="grid"] { display: none; }
-    body:not([data-display-mode="text"]) .view-panel[data-panel="grid"] { display: grid; }
-    body:not([data-display-mode="text"]) .view-panel[data-panel="text"] { display: none; }
-    .list-wrapper {
-      overflow-x: auto;
-      background: rgba(12, 22, 38, 0.8);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-    }
-    table.list-table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 1000px;
-      color: rgba(224, 235, 255, 0.9);
-    }
-    table.list-table th,
-    table.list-table td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      vertical-align: top;
-    }
-    table.list-table th {
-      font-size: 0.82rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: rgba(206, 220, 255, 0.75);
-    }
-    table.list-table tr.list-row:hover {
-      background: rgba(70, 100, 160, 0.18);
-    }
-    .row-meta {
-      font-size: 0.75rem;
-      color: rgba(200, 214, 240, 0.68);
-    }
-    .toggle-row {
-      grid-column: 1 / -1;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .segmented-fieldset {
-      flex: 1 1 260px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      padding: 0.9rem 1.1rem 1.1rem;
-      margin: 0;
-      background: rgba(10, 20, 36, 0.9);
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-    .segmented-fieldset legend {
-      padding: 0 0.4rem;
-      font-size: 0.85rem;
-      color: rgba(208, 222, 255, 0.82);
-    }
-    .segmented-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-    }
-    .segmented-option {
-      display: inline-flex;
-      align-items: center;
-    }
-    .segmented-option input {
-      display: none;
-    }
-    .checkbox-field {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    .checkbox-field input {
-      width: 1rem;
-      height: 1rem;
-    }
-    .segmented-option span {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.45rem 0.95rem;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: rgba(255, 255, 255, 0.06);
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: background 0.15s ease, border 0.15s ease, color 0.15s ease, transform 0.15s ease;
-    }
-    .segmented-option input:checked + span {
-      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-      border-color: transparent;
-      color: #fff;
-      transform: translateY(-1px);
-    }
-    .gallery-grid {
-      display: grid;
-      width: 100%;
-      gap: 2rem;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    }
-    body[data-size-mode="xl"] .gallery-grid {
-      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-      gap: 2.6rem;
-    }
-    body[data-size-mode="lg"] .gallery-grid {
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 2.4rem;
-    }
-    body[data-size-mode="md"] .gallery-grid {
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 2.1rem;
-    }
-    body[data-size-mode="xs"] .gallery-grid {
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 1.6rem;
-    }
-    body[data-size-mode="xxs"] .gallery-grid {
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 1.3rem;
-    }
+    .radio-stack { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; }
+    .checkbox-field { flex-direction: row !important; align-items: center; gap: 0.4rem; }
+    .button-cell { display: flex; gap: 0.5rem; align-items: center; }
+    .viewer-main .view-panel { background: rgba(8,14,26,0.92); border: 1px solid var(--panel-border); border-radius: 16px; padding: 1rem; }
+    .illust-table { width: 100%; border-collapse: collapse; }
+    .illust-table th, .illust-table td { padding: 0.65rem 0.45rem; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; }
+    .illust-table th { font-size: 0.82rem; letter-spacing: 0.02em; color: rgba(230,235,255,0.85); }
+    .illust-title a { font-weight: 600; }
+    .row-sub { font-size: 0.8rem; color: rgba(205,215,235,0.7); }
+    .meta-button { border: 1px solid rgba(255,255,255,0.35); background: transparent; border-radius: 999px; padding: 0.2rem 0.7rem; color: inherit; cursor: pointer; font-size: 0.78rem; }
+    .pill { display: inline-flex; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.72rem; }
+    .pill-r18 { background: rgba(255,120,150,0.18); border: 1px solid rgba(255,120,150,0.35); }
+    .pill-ai { background: rgba(120,255,210,0.18); border: 1px solid rgba(120,255,210,0.35); }
+    .rating-stack { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .badge.rating-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); font-size: 0.78rem; min-height: 1.5rem; }
+    .rating-gauge { width: 110px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 999px; overflow: hidden; display: none; }
+    .rating-gauge-fill { display: block; height: 100%; background: linear-gradient(90deg,#ffdf7e,#ffa14d); }
+    .axis-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+    .axis-chip { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 0.25rem 0.5rem; }
+    .tag-panel { margin-top: 0.35rem; }
+    .tag-button { border: 1px solid rgba(255,255,255,0.25); background: transparent; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.75rem; color: inherit; cursor: pointer; }
+    .tag-button.custom { border-color: rgba(120,255,210,0.45); }
+    .inline-editor { margin-top: 0.4rem; }
+    .inline-body { margin-top: 0.45rem; display: flex; flex-direction: column; gap: 0.45rem; }
+    .inline-axis { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+    .inline-axis select { min-width: 80px; padding: 0.35rem 0.4rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(8,14,28,0.85); color: inherit; }
+    .inline-tags input { width: 100%; }
+    .inline-actions { display: flex; align-items: center; gap: 0.45rem; }
+    .gallery-grid { display: grid; gap: 1rem; }
+    .gallery-grid.size-xxs { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .gallery-grid.size-xs  { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .gallery-grid.size-md  { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .gallery-grid.size-lg  { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .gallery-grid.size-xl  { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .card { border: 1px solid var(--panel-border); border-radius: 16px; background: rgba(10,18,32,0.92); overflow: hidden; display: flex; flex-direction: column; }
+    .card figure { margin: 0; position: relative; }
+    .card img { display: block; width: 100%; height: auto; object-fit: cover; }
+    .card figcaption { padding: 0.4rem 0.7rem; font-size: 0.85rem; color: rgba(220,230,250,0.85); display: flex; justify-content: space-between; gap: 0.4rem; }
+    .card-body { padding: 0.8rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .card-meta { display: flex; justify-content: space-between; gap: 0.4rem; font-size: 0.85rem; color: rgba(210,220,235,0.85); }
+    .flag-row { display: flex; gap: 0.3rem; }
+    .pagination { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 1rem; }
+    .pagination a, .pagination span { padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); }
+    .pagination .current { background: rgba(255,255,255,0.2); }
+    .pagination .disabled { opacity: 0.4; }
+    .empty-state { padding: 2rem; text-align: center; color: rgba(230,236,255,0.8); }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 80; display: none; }
+    .modal-backdrop.active { display: block; }
+    .log-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 90; }
+    .log-modal.active { display: flex; }
+    .log-modal__dialog { width: min(720px, 90vw); max-height: 80vh; background: rgba(12,20,36,0.95); border-radius: 16px; padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; }
+    .log-scroll { flex: 1; overflow-y: auto; border: 1px solid var(--panel-border); border-radius: 12px; padding: 0.6rem; background: rgba(8,14,28,0.82); }
+    .log-scroll ul { list-style: none; margin: 0; padding: 0; }
+    .log-scroll li { padding: 0.25rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
     @media (max-width: 960px) {
       .viewer-shell { grid-template-columns: 1fr; }
-      .sidebar-panel { position: relative; height: auto; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-      body[data-sidebar="hidden"] .viewer-shell { grid-template-columns: 1fr; }
-      body[data-sidebar="hidden"] .sidebar-panel { display: none; }
-      .sidebar-restore { bottom: 1.2rem; top: auto; }
-      .toggle-row { flex-direction: column; }
-      .segmented-fieldset { flex-basis: auto; }
-      .gallery-grid { gap: 1.6rem; }
-      body[data-size-mode="xl"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
-      body[data-size-mode="lg"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-      body[data-size-mode="md"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-      body[data-size-mode="xs"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-      body[data-size-mode="xxs"] .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-    }
-    @media (max-width: 640px) {
-      .gallery-grid { gap: 1.1rem; }
-      body[data-size-mode="xl"] .gallery-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-      body[data-size-mode="lg"] .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      body[data-size-mode="md"] .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      body[data-size-mode="xs"] .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      body[data-size-mode="xxs"] .gallery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      min-height: 100%;
-      transition: transform 0.18s ease, box-shadow 0.18s ease;
-      box-shadow: 0 24px 40px rgba(6, 10, 26, 0.55);
-    }
-    .card:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 32px 52px rgba(8, 14, 32, 0.62);
-    }
-        .card-links {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 0.6rem;
-    }
-    .card-links .pixiv-link {
-      font-size: 0.8rem;
-      padding: 0.35rem 0.9rem;
-    }
-.rating-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-    .axis-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-    }
-    .axis-chip {
-      padding: 0.25rem 0.55rem;
-      border-radius: 999px;
-      background: rgba(120, 150, 255, 0.18);
-      border: 1px solid rgba(140, 170, 255, 0.25);
-      font-size: 0.75rem;
-      color: rgba(220, 230, 255, 0.85);
-    }
-    .axis-chip-label {
-      font-size: 0.75rem;
-      color: rgba(215, 228, 255, 0.85);
-      white-space: nowrap;
-    }
-    .rating-badge.axis-badge {
-      padding: 0.22rem 0.5rem;
-      font-size: 0.75rem;
-      gap: 0.35rem;
-    }
-    .rating-badge.axis-badge.mode-bar .rating-gauge {
-      width: 100px;
-    }
-    .preview-wrapper {
-      position: relative;
-      background: rgba(0, 0, 0, 0.65);
-      border-radius: 0;
-    }
-    .preview-link {
-      display: block;
-      width: 100%;
-      padding: 0;
-      margin: 0;
-      border: none;
-      background: transparent;
-      cursor: zoom-in;
-    }
-    .preview-link img {
-      display: block;
-      width: 100%;
-      aspect-ratio: 5 / 7;
-      object-fit: cover;
-    }
-    .info-overlay {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      padding: 1rem 1.1rem 0.9rem;
-      background: linear-gradient(180deg, rgba(6, 12, 24, 0.9), rgba(6, 12, 24, 0.45) 60%, transparent);
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      color: #f6f8ff;
-      pointer-events: none;
-    }
-    .overlay-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 0.6rem;
-    }
-    .overlay-title {
-      font-size: 0.95rem;
-      font-weight: 600;
-      line-height: 1.2;
-    }
-    .overlay-flags {
-      display: flex;
-      gap: 0.35rem;
-      flex-wrap: wrap;
-    }
-    .overlay-pill {
-      padding: 0.25rem 0.55rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.2);
-      font-size: 0.7rem;
-      pointer-events: auto;
-    }
-    .overlay-pill.r18 { background: rgba(255, 90, 140, 0.4); }
-    .overlay-pill.ai { background: rgba(120, 255, 210, 0.35); }
-    .overlay-meta {
-      display: flex;
-      gap: 0.55rem;
-      flex-wrap: wrap;
-      font-size: 0.75rem;
-      color: rgba(220, 230, 255, 0.85);
-    }
-    .overlay-link {
-      border: none;
-      background: none;
-      color: rgba(180, 210, 255, 0.95);
-      text-decoration: underline;
-      cursor: pointer;
-      pointer-events: auto;
-      font: inherit;
-      padding: 0;
-    }
-    .overlay-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      font-size: 0.7rem;
-      max-height: 6rem;
-      overflow-y: auto;
-      padding-right: 0.25rem;
-    }
-    .overlay-tag {
-      border: none;
-      border-radius: 999px;
-      padding: 0.25rem 0.55rem;
-      background: rgba(255, 255, 255, 0.18);
-      color: #f4f6ff;
-      cursor: pointer;
-      pointer-events: auto;
-    }
-    .overlay-tag.custom {
-      background: rgba(140, 120, 255, 0.3);
-    }
-    .inline-editor.compact {
-      margin-top: 0.45rem;
-      padding: 0.6rem 0.75rem 0.85rem;
-      gap: 0.55rem;
-    }
-    .inline-editor.compact .inline-axes {
-      gap: 0.35rem;
-      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    }
-    .inline-editor.compact select,
-    .inline-editor.compact .inline-tags-input {
-      padding: 0.35rem 0.5rem;
-      font-size: 0.78rem;
-    }
-    .inline-editor.compact label {
-      gap: 0.25rem;
-    }
-    .inline-editor.compact .inline-save {
-      padding: 0.35rem 0.8rem;
-      font-size: 0.78rem;
-    }
-    .inline-editor.compact .inline-actions {
-      gap: 0.45rem;
-    }
-    .inline-editor.compact .inline-status {
-      font-size: 0.72rem;
-    }
-    .inline-editor .inline-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.6rem;
-    }
-    .inline-editor .inline-header .inline-toggle {
-      flex-shrink: 0;
-    }
-    .inline-editor .inline-header .pixiv-link {
-      font-size: 0.8rem;
-      padding: 0.35rem 0.9rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-    .inline-editor .inline-header .pixiv-link:hover {
-      background: rgba(255, 255, 255, 0.16);
-      border-color: rgba(255, 255, 255, 0.32);
-    }
-    .inline-editor .inline-body {
-      margin-top: 0.75rem;
-    }
-    body[data-display-mode="image"] .info-overlay {
-      display: none;
-    }
-    body[data-display-mode="image"] .card-body {
-      display: none !important;
-    }
-    body[data-display-mode="image"] figure figcaption {
-      display: none;
-    }
-    body[data-display-mode="image"] .card {
-      min-height: auto;
-    }
-    figure {
-      margin: 0;
-      background: rgba(14, 24, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    figure figcaption {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.6rem;
-      padding: 0.6rem 0.75rem;
-      font-size: 0.8rem;
-      color: rgba(220, 230, 255, 0.72);
-      background: rgba(10, 18, 32, 0.9);
-    }
-    .card-body {
-      padding: 1.6rem 1.6rem 1.9rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(10, 18, 32, 0.92);
-    }
-
-      background: rgba(255, 210, 120, 0.16);
-      color: #ffe9bb;
-      border-color: rgba(255, 210, 150, 0.28);
-    }
-    .card-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 0.7rem;
-    }
-    .card-title { font-size: 1.1rem; font-weight: 600; }
-    .pixiv-link {
-      font-size: 0.82rem;
-      background: rgba(120, 150, 255, 0.25);
-      border-radius: 999px;
-      padding: 0.35rem 0.85rem;
-      text-decoration: none;
-    }
-    .meta-line {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      font-size: 0.88rem;
-      color: rgba(210, 224, 255, 0.78);
-    }
-    .meta-line.secondary {
-      font-size: 0.78rem;
-      color: rgba(200, 214, 240, 0.68);
-    }
-    .meta-button {
-      border: none;
-      background: none;
-      color: inherit;
-      font: inherit;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-    .badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.3rem 0.7rem;
-      border-radius: 999px;
-      background: rgba(90, 128, 230, 0.25);
-      border: 1px solid rgba(90, 128, 230, 0.36);
-      letter-spacing: 0.03em;
-      font-size: 0.85rem;
-    }
-    .pill { background: rgba(255, 255, 255, 0.12); }
-    .pill-r18 { background: var(--badge-r18); border-color: rgba(255, 116, 156, 0.42); }
-    .pill-ai { background: var(--badge-ai); border-color: rgba(116, 255, 210, 0.42); }
-    .rating-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.28rem 0.65rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-    .rating-badge.quick-rate {
-      cursor: pointer;
-      transition: transform 0.12s ease;
-      touch-action: manipulation;
-    }
-    .rating-badge.quick-rate:not(.is-pending):hover {
-      transform: translateY(-1px);
-    }
-    .rating-badge.quick-rate.is-pending {
-      opacity: 0.65;
-      cursor: progress;
-    }
-    .rating-output { letter-spacing: 0.12em; }
-    .rating-badge.mode-stars .rating-output {
-      letter-spacing: 0.18em;
-      color: #ffd861;
-      text-shadow: 0 0 8px rgba(255, 216, 97, 0.45);
-    }
-    .rating-badge.mode-circles .rating-output { letter-spacing: 0.14em; }
-    .rating-badge.mode-squares .rating-output { letter-spacing: 0.1em; }
-    .rating-badge.mode-numeric .rating-output { letter-spacing: 0.05em; }
-    .rating-badge.mode-bar {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.35rem;
-    }
-    .rating-gauge {
-      display: none;
-      width: 140px;
-      height: 6px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.16);
-    }
-    .rating-badge.mode-bar .rating-gauge {
-      display: block;
-    }
-    .rating-gauge-fill {
-      display: block;
-      height: 100%;
-      background: linear-gradient(135deg, #ffd764, #ff9f60);
-      width: 0%;
-    }
-    .tag-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      margin-top: 0.6rem;
-    }
-    .tag-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-    .tag-pills[data-scrollable="list"] {
-      max-height: 6.5rem;
-      overflow-y: auto;
-      padding-right: 0.4rem;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-    .tag-pills[data-scrollable="list"]::-webkit-scrollbar {
-      width: 0;
-      height: 0;
-    }
-    .tag-pills[data-scrollable="list"]:not([data-expanded="true"]) {
-      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 75%, rgba(0, 0, 0, 0));
-      -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 75%, rgba(0, 0, 0, 0));
-    }
-    .tag-pills[data-scrollable="list"][data-expanded="true"] {
-      max-height: none;
-      overflow: visible;
-      mask-image: none;
-      -webkit-mask-image: none;
-    }
-    .tag-expand {
-      align-self: flex-start;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.08);
-      color: inherit;
-      font: inherit;
-      font-size: 0.74rem;
-      padding: 0.28rem 0.9rem;
-      cursor: pointer;
-    }
-    .tag-expand:hover {
-      background: rgba(255, 255, 255, 0.16);
-    }
-    .overlay-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      font-size: 0.7rem;
-      max-height: 6rem;
-      overflow-y: auto;
-      padding-right: 0.25rem;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-    .overlay-tags::-webkit-scrollbar {
-      width: 0;
-      height: 0;
-    }
-    .tag-button {
-      border: none;
-      border-radius: 12px;
-      background: rgba(31, 52, 86, 0.88);
-      color: inherit;
-      font: inherit;
-      padding: 0.3rem 0.7rem;
-      cursor: pointer;
-    }
-    .tag-button:hover { background: rgba(52, 82, 132, 0.95); }
-    .tag-button.custom { background: rgba(255, 210, 120, 0.25); color: #ffe7b0; }
-    .inline-editor {
-      margin-top: 0.75rem;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 12px;
-      padding: 0.75rem 0.9rem;
-      background: rgba(8, 16, 30, 0.92);
-      display: flex;
-      flex-direction: column;
-      gap: 0.7rem;
-    }
-    .inline-editor .inline-body[hidden] { display: none !important; }
-    .inline-toggle {
-      align-self: flex-start;
-      padding: 0.35rem 0.9rem;
-      font-size: 0.78rem;
-    }
-    .inline-editor .inline-axis-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.4rem;
-      flex-direction: row;
-    }
-    .inline-editor .inline-axis-name {
-      font-size: 0.75rem;
-      color: rgba(208, 220, 255, 0.78);
-    }
-    .inline-editor.list { background: rgba(8, 16, 30, 0.96); }
-    .inline-editor label {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-      font-size: 0.78rem;
-      color: rgba(208, 220, 255, 0.78);
-    }
-    .inline-editor select,
-    .inline-tags-input {
-      padding: 0.45rem 0.6rem;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(6, 12, 24, 0.92);
-      color: inherit;
-      font: inherit;
-    }
-    .inline-axes {
-      display: grid;
-      gap: 0.45rem;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    }
-    .inline-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-    }
-    .inline-status {
-      font-size: 0.78rem;
-      color: rgba(200, 214, 240, 0.7);
-      min-width: 6rem;
-    }
-    nav.pagination {
-      margin-top: 3rem;
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    nav.pagination a,
-    nav.pagination span {
-      padding: 0.55rem 0.85rem;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      text-decoration: none;
-      min-width: 2.4rem;
-      text-align: center;
-    }
-    nav.pagination span.current {
-      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-      border: none;
-      color: white;
-      font-weight: 600;
-    }
-    nav.pagination span.disabled { opacity: 0.45; }
-    .empty-state {
-      padding: 5rem 1.6rem;
-      text-align: center;
-      color: rgba(210, 220, 240, 0.75);
-      border: 1px dashed rgba(255, 255, 255, 0.16);
-      border-radius: 16px;
-      background: rgba(14, 24, 40, 0.65);
-    }
-
-    .results-summary {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.8rem;
-      margin-bottom: 1.8rem;
-      color: rgba(210, 222, 255, 0.78);
-      font-size: 0.9rem;
-    }
-    .results-summary span {
-      background: rgba(12, 22, 38, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      padding: 0.45rem 0.9rem;
-    }
-    .log-scroll {
-      flex: 1 1 auto;
-      width: 100%;
-      min-height: 320px;
-      overflow: auto;
-      background: rgba(6, 12, 22, 0.78);
-      border-radius: 16px;
-      padding: 0.25rem 0.25rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    #log-entries {
-      margin: 0;
-      padding: 0.75rem;
-      border-radius: 8px;
-      background: rgba(6, 12, 22, 0.95);
-      font-size: 0.8rem;
-      color: rgba(208, 220, 255, 0.86);
-      overflow-y: auto;
-      max-height: 180px;
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-    #log-entries li {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 0.25rem 0;
-    }
-    #log-entries li:last-child {
-      border-bottom: none;
-    }
-    .log-meta {
-      display: inline-block;
-      margin-right: 0.4rem;
-      font-weight: 600;
-      color: rgba(170, 190, 255, 0.85);
-    }
-    .log-msg {
-      color: rgba(216, 228, 255, 0.9);
-    }
-
-    @media (min-width: 1024px) {
-      .gallery-grid {
-        gap: 2.6rem;
-      }
-      .card-body {
-      padding: 1.6rem 1.6rem 1.9rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(10, 18, 32, 0.92);
-    }
-    }
-    @media (max-width: 960px) {
-      header.app-header {
-        position: static;
-        padding: 1.4rem clamp(1rem, 6vw, 1.8rem);
-      }
-      .header-actions { margin-left: 0; }
-      form.filters { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-      .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-    }
-    @media (max-width: 640px) {
-      .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-      .card-body {
-      padding: 1.6rem 1.6rem 1.9rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(10, 18, 32, 0.92);
+      .sidebar-panel { position: static; height: auto; }
     }
   </style>
 </head>
-<body
-  class="display-{{ display_mode }} size-{{ size_mode }}"
-  data-display-mode="{{ display_mode }}"
-  data-size-mode="{{ size_mode }}"
-  data-default-axis="{{ default_axis_id }}"
-  data-default-max="{{ default_axis_max }}"
-  data-rating-axes='{{ rating_axes_json|tojson }}'
->
-    <button type="button" class="secondary sidebar-restore" id="restore-sidebar">繧ｵ繧､繝峨ヰ繝ｼ繧定｡ｨ遉ｺ</button>
+<body data-default-axis="{{ default_axis_id }}">
   <div class="viewer-shell">
     <aside class="sidebar-panel">
       <div class="sidebar-top">
-        <h1>Pixloader Viewer</h1>
+        <h1>Pixloader ビューア</h1>
+        <p class="sidebar-sub">Pixiv ブックマークをローカルに保存し、検索と評価ができます。</p>
         <div class="header-actions">
-          <a class="link-button" href="{{ url_for('manage_rating_axes') }}">Manage rating axes</a>
-          <button type="button" id="sync-now-button">Sync now</button>
-          <input
-            type="number"
-            id="fetch-recent-limit"
-            class="secondary select-inline"
-            min="1"
-            max="500"
-            step="25"
-            value="100"
-            list="fetch-recent-presets"
-            aria-label="Number of recent bookmarks to fetch"
-          >
-          <datalist id="fetch-recent-presets">
-            <option value="25">Latest 25</option>
-            <option value="50">Latest 50</option>
-            <option value="75">Latest 75</option>
-            <option value="100">Latest 100</option>
-            <option value="150">Latest 150</option>
-            <option value="200">Latest 200</option>
-            <option value="300">Latest 300</option>
-            <option value="500">Latest 500</option>
-          </datalist>
-          <button type="button" class="secondary" id="fetch-recent-button">Fetch latest 100</button>
-          <button type="button" class="secondary" id="toggle-logs">Show logs</button>
-          <button type="button" class="secondary" id="toggle-sidebar-visibility" data-show-label="Show sidebar" data-hide-label="Hide sidebar">Hide sidebar</button>
-          <button type="button" class="secondary" id="refresh-button">Refresh list</button>
+          <button type="button" id="sync-now-button">今すぐ同期</button>
+          <button type="button" class="secondary" id="toggle-logs">ログを見る</button>
+          <a class="link-button secondary" href="{{ url_for('manage_rating_axes') }}">評価軸を管理</a>
+          <button type="button" class="secondary subtle" id="toggle-sidebar-visibility" data-hide-label="サイドバーを隠す" data-show-label="サイドバーを表示">サイドバーを隠す</button>
         </div>
-      </div>
-      <div class="status-row">
-        <div class="status-chip" id="sync-status">Sync status is loading窶ｦ</div>
-        <div class="status-chip" id="metadata-status" data-pending="{{ pending_metadata }}">
-          {% if pending_metadata %}
-            Pending metadata: {{ pending_metadata }} item(s)
-          {% else %}
-            Metadata is up to date
-          {% endif %}
-        </div>
-        <div class="status-chip" id="recent-status">Recent bookmark fetch is idle</div>
-      </div>
-      <div class="maintenance-panel">
-        <div class="maintenance-header">
-          <h2>Maintenance</h2>
-          <div class="maintenance-actions">
-            <button type="button" id="verify-files-button">Run file integrity check</button>
-            <button type="button" id="verify-bookmarks-button">Run bookmark reconciliation</button>
-          </div>
-        </div>
-        <p class="maintenance-status" id="maintenance-status">Maintenance has not been run yet.</p>
-        <p class="maintenance-hint">Use these tasks to verify downloads and re-fetch anything missing.</p>
-        <p class="maintenance-hint">Bookmark reconciliation and recent fetch use the Pixiv API窶蚤void running them too frequently.</p>
       </div>
 
-      <form class="filters" method="get">
-        <input type="hidden" name="page" value="{{ page }}">
-        <div class="toggle-row">
-          <fieldset class="segmented-fieldset">
-            <legend>諠・ｱ陦ｨ遉ｺ</legend>
-            <div class="segmented-group" role="radiogroup" aria-label="諠・ｱ陦ｨ遉ｺ">
+      <div class="status-row">
+        <div class="status-chip" id="sync-status">同期状態を取得しています...</div>
+        <div class="status-chip" id="metadata-status" data-pending="{{ pending_metadata }}">
+          {% if pending_metadata %}
+            メタデータ: 残り {{ pending_metadata }} 件
+          {% else %}
+            メタデータは最新です
+          {% endif %}
+        </div>
+        <div class="status-chip" id="recent-status">最新ブックマーク取得は待機中です</div>
+      </div>
+
+      <div class="maintenance-panel">
+        <div class="maintenance-header">
+          <h2>メンテナンス</h2>
+          <p class="maintenance-status" id="maintenance-status">タスクは実行されていません。</p>
+        </div>
+        <div class="maintenance-actions">
+          <button type="button" id="verify-files-button">ファイル検証</button>
+          <button type="button" id="verify-bookmarks-button">ブクマ検証</button>
+          <div class="recent-fetch">
+            <input type="number" id="fetch-recent-limit" min="1" max="500" step="25" value="100">
+            <button type="button" class="secondary" id="fetch-recent-button">最新取得</button>
+          </div>
+        </div>
+        <p class="maintenance-hint">Pixiv API を利用する処理のため、短時間に繰り返さないよう注意してください。</p>
+      </div>
+    </aside>
+
+    <main class="viewer-main">
+      <section class="results-summary">
+        <span>総件数: {{ pagination.total }}</span>
+        <span>ページ: {{ pagination.page }} / {{ pagination.pages }}</span>
+        <span>1ページ {{ per_page }} 件</span>
+        <span>表示: {{ display_label_map.get(display_mode, display_mode) }}</span>
+        <span>カードサイズ: {{ size_label_map.get(size_mode, size_mode) }}</span>
+      </section>
+
+      <section class="filters-panel">
+        <form class="filters" method="get">
+          <input type="hidden" name="page" value="{{ page }}">
+          <label>
+            表示モード
+            <div class="radio-stack">
               {% for option in display_mode_options %}
-              <label class="segmented-option">
+              <label style="display:inline-flex;align-items:center;gap:0.25rem;">
                 <input type="radio" name="display" value="{{ option.value }}" {{ 'checked' if display_mode == option.value else '' }}>
                 <span>{{ option.label }}</span>
               </label>
               {% endfor %}
             </div>
-          </fieldset>
-          <fieldset class="segmented-fieldset">
-            <legend>逕ｻ蜒上し繧､繧ｺ</legend>
-            <div class="segmented-group" role="radiogroup" aria-label="逕ｻ蜒上し繧､繧ｺ">
+          </label>
+          <label>
+            サムネイルのサイズ
+            <div class="radio-stack">
               {% for option in size_mode_options %}
-              <label class="segmented-option">
+              <label style="display:inline-flex;align-items:center;gap:0.25rem;">
                 <input type="radio" name="size" value="{{ option.value }}" {{ 'checked' if size_mode == option.value else '' }}>
                 <span>{{ option.label }}</span>
               </label>
               {% endfor %}
             </div>
-          </fieldset>
-        </div>
-        <label>
-          荳ｦ縺ｳ鬆・          <select name="sort">
-            <option value="downloaded_at" {{ 'selected' if sort == 'downloaded_at' else '' }}>繝繧ｦ繝ｳ繝ｭ繝ｼ繝画律譎・/option>
-            <option value="posted_at" {{ 'selected' if sort == 'posted_at' else '' }}>謚慕ｨｿ譌･譎・/option>
-            <option value="bookmarked_at" {{ 'selected' if sort == 'bookmarked_at' else '' }}>繝悶ャ繧ｯ繝槭・繧ｯ譌･譎・/option>
-            <option value="bookmarks" {{ 'selected' if sort == 'bookmarks' else '' }}>繝悶ャ繧ｯ繝槭・繧ｯ謨ｰ</option>
-            <option value="views" {{ 'selected' if sort == 'views' else '' }}>髢ｲ隕ｧ謨ｰ</option>
-            <option value="title" {{ 'selected' if sort == 'title' else '' }}>繧ｿ繧､繝医Ν</option>
-            <option value="rating" {{ 'selected' if sort == 'rating' else '' }}>譌｢螳夊ｩ穂ｾ｡</option>
-            <option value="random" {{ 'selected' if sort == 'random' else '' }}>繝ｩ繝ｳ繝繝</option>
-            {% for axis in rating_axes %}
-            <option value="axis_{{ axis.axis_id }}" {{ 'selected' if sort == 'axis_' ~ axis.axis_id else '' }}>隧穂ｾ｡: {{ axis.name }}</option>
-            {% endfor %}
-        </select>
-        </label>
-        <label>
-          譏・・/ 髯埼・          <select name="order">
-            <option value="desc" {{ 'selected' if order == 'desc' else '' }}>髯埼・/option>
-            <option value="asc" {{ 'selected' if order == 'asc' else '' }}>譏・・/option>
-          </select>
-        </label>
-        <label>
-          繧ｿ繧ｰ讀懃ｴ｢
-          <input type="text" name="tag" value="{{ tag or '' }}" placeholder="繧ｫ繝ｳ繝槫玄蛻・ｊ縺ｧ蜈･蜉・>
-        </label>
-        <label>
-          菴懆・          <input type="text" name="artist" value="{{ artist or '' }}">
-        </label>
-        <label>
-          繧ｿ繧､繝医Ν
-          <input type="text" name="title" value="{{ title or '' }}">
-        </label>
-        <label>
-          R-18
-          <select name="r18">
-            <option value="all" {{ 'selected' if r18 == 'all' else '' }}>縺吶∋縺ｦ</option>
-            <option value="only" {{ 'selected' if r18 == 'only' else '' }}>R-18縺ｮ縺ｿ</option>
-            <option value="exclude" {{ 'selected' if r18 == 'exclude' else '' }}>R-18繧帝勁螟・/option>
-          </select>
-        </label>
-        <label>
-          AI菴懷刀
-          <select name="ai">
-            <option value="all" {{ 'selected' if ai == 'all' else '' }}>縺吶∋縺ｦ</option>
-            <option value="only" {{ 'selected' if ai == 'only' else '' }}>AI縺ｮ縺ｿ</option>
-            <option value="exclude" {{ 'selected' if ai == 'exclude' else '' }}>AI繧帝勁螟・/option>
-          </select>
-        </label>
-        <label>
-          隧穂ｾ｡霆ｸ繝輔ぅ繝ｫ繧ｿ繝ｼ
-          <select name="rating_axis">
-            <option value="" {{ 'selected' if rating_axis is none else '' }}>謖・ｮ壹↑縺・/option>
-            {% for axis in rating_axes %}
-            <option value="{{ axis.axis_id }}" {{ 'selected' if rating_axis == axis.axis_id else '' }}>{{ axis.name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          隧穂ｾ｡蛟､
-          <select name="rating_value">
-            <option value="" {{ 'selected' if rating_axis is none else '' }}>謖・ｮ壹↑縺・/option>
-            {% for value in range(0, rating_filter_max + 1) %}
-            {% set selected_value = (rating_axis is not none) and (rating_value == value) %}
-            <option value="{{ value }}" {{ 'selected' if selected_value else '' }}>{{ value }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          隧穂ｾ｡豈碑ｼ・          <select name="rating_compare">
-            {% for option in rating_compare_options %}
-            <option value="{{ option.value }}" {{ 'selected' if rating_compare == option.value else '' }}>{{ option.label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="checkbox-field">
-          <input type="checkbox" name="include_unknown" value="1" {{ 'checked' if include_unknown == '1' else '' }}>
-          <span>繧ｿ繧､繝医Ν繝ｻ菴懆・悴險ｭ螳壹ｒ陦ｨ遉ｺ</span>
-        </label>
+          </label>
+          <label>
+            並び替え
+            <select name="sort">
+              <option value="downloaded_at" {{ 'selected' if sort == 'downloaded_at' else '' }}>ダウンロード日</option>
+              <option value="posted_at" {{ 'selected' if sort == 'posted_at' else '' }}>投稿日</option>
+              <option value="bookmarked_at" {{ 'selected' if sort == 'bookmarked_at' else '' }}>ブクマ日</option>
+              <option value="bookmarks" {{ 'selected' if sort == 'bookmarks' else '' }}>ブクマ数</option>
+              <option value="views" {{ 'selected' if sort == 'views' else '' }}>閲覧数</option>
+              <option value="title" {{ 'selected' if sort == 'title' else '' }}>タイトル</option>
+              <option value="rating" {{ 'selected' if sort == 'rating' else '' }}>既定評価</option>
+              <option value="random" {{ 'selected' if sort == 'random' else '' }}>ランダム</option>
+              {% for axis in rating_axes %}
+              <option value="axis_{{ axis.axis_id }}" {{ 'selected' if sort == 'axis_' ~ axis.axis_id else '' }}>評価: {{ axis.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            昇順 / 降順
+            <select name="order">
+              <option value="desc" {{ 'selected' if order == 'desc' else '' }}>降順</option>
+              <option value="asc" {{ 'selected' if order == 'asc' else '' }}>昇順</option>
+            </select>
+          </label>
+          <label>
+            タイトルに含める文字
+            <input type="text" name="title" value="{{ title or '' }}" placeholder="例: オリジナル">
+          </label>
+          <label>
+            作者名
+            <input type="text" name="artist" value="{{ artist or '' }}" placeholder="例: 作者名">
+          </label>
+          <label>
+            タグ (カンマ区切り)
+            <input type="text" name="tag" value="{{ tag or '' }}" placeholder="#pixiv #一次創作">
+          </label>
+          <label>
+            R-18
+            <select name="r18">
+              <option value="all" {{ 'selected' if r18 == 'all' else '' }}>すべて</option>
+              <option value="only" {{ 'selected' if r18 == 'only' else '' }}>R-18 のみ</option>
+              <option value="exclude" {{ 'selected' if r18 == 'exclude' else '' }}>R-18 を除外</option>
+            </select>
+          </label>
+          <label>
+            AI 作品
+            <select name="ai">
+              <option value="all" {{ 'selected' if ai == 'all' else '' }}>すべて</option>
+              <option value="only" {{ 'selected' if ai == 'only' else '' }}>AI のみ</option>
+              <option value="exclude" {{ 'selected' if ai == 'exclude' else '' }}>AI を除外</option>
+            </select>
+          </label>
+          <label>
+            評価フィルター (軸)
+            <select name="rating_axis">
+              <option value="">指定しない</option>
+              {% for axis in rating_axes %}
+              <option value="{{ axis.axis_id }}" {{ 'selected' if rating_axis == axis.axis_id else '' }}>{{ axis.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            評価フィルター (値)
+            <input type="number" name="rating_value" min="0" max="{{ rating_filter_max }}" value="{{ rating_value }}">
+          </label>
+          <label>
+            評価条件
+            <select name="rating_compare">
+              {% for option in rating_compare_options %}
+              <option value="{{ option.value }}" {{ 'selected' if rating_compare == option.value else '' }}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="checkbox-field">
+            <input type="checkbox" name="include_unknown" value="1" {{ 'checked' if include_unknown == '1' else '' }}>
+            <span>タイトル・作者が未設定の作品も含める</span>
+          </label>
+          <label>
+            1ページあたり
+            <select name="per_page">
+              {% for option in per_page_options %}
+              <option value="{{ option }}" {{ 'selected' if per_page == option else '' }}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="button-cell">
+            <button type="submit" class="secondary">検索</button>
+            <button type="button" class="secondary" id="reset-button">絞り込みをリセット</button>
+          </div>
+        </form>
+      </section>
 
-        <label>
-          1繝壹・繧ｸ縺ゅ◆繧・          <select name="per_page" id="per-page-select">
-            {% for option in per_page_options %}
-            <option value="{{ option }}" {{ 'selected' if per_page == option else '' }}>{{ option }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <div class="button-cell">
-          <button type="submit" class="secondary">讀懃ｴ｢</button>
-          <button type="button" class="secondary" id="reset-button">譚｡莉ｶ繧偵Μ繧ｻ繝・ヨ</button>
-        </div>
-      </form>
-          </aside>
-    <main class="viewer-main">
-    <div class="results-summary">
-      <span>邱丈ｻｶ謨ｰ: {{ pagination.total }}</span>
-      <span>繝壹・繧ｸ: {{ pagination.page }} / {{ pagination.pages }}</span>
-      <span>1繝壹・繧ｸ {{ per_page }} 莉ｶ</span>
-      <span>諠・ｱ陦ｨ遉ｺ: {{ display_label_map.get(display_mode, display_mode) }}</span>
-      <span>逕ｻ蜒上し繧､繧ｺ: {{ size_label_map.get(size_mode, size_mode) }}</span>
-    </div>
-    {% include 'gallery.html' %}
-  </main>
+      {% include 'gallery.html' %}
+    </main>
   </div>
 
   <div class="modal-backdrop" id="log-backdrop"></div>
-  <div class="log-modal" id="log-modal">
+  <div class="log-modal" id="log-modal" aria-hidden="true">
     <div class="log-modal__dialog">
-      <div class="log-modal__header">
-        <h2 class="log-modal__title">譛譁ｰ繝ｭ繧ｰ</h2>
-        <div class="log-modal__actions">
-          <button type="button" class="secondary" id="refresh-logs">譛譁ｰ繧貞叙蠕・/button>
-          <button type="button" class="secondary" id="close-log-modal">髢峨§繧・/button>
+      <div class="log-modal__header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0">最新ログ</h2>
+        <div class="header-actions">
+          <button type="button" class="secondary" id="refresh-logs">最新を取得</button>
+          <button type="button" class="secondary" id="close-log-modal">閉じる</button>
         </div>
       </div>
       <div class="log-scroll">
@@ -1248,1352 +356,311 @@
   </div>
 
   <script>
-    (() => {
-      const body = document.body;
-      const filtersForm = document.querySelector('form.filters');
-      let ratingAxesData = [];
+    function toast(message) {
+      console.info(message);
+    }
+
+    async function postJSON(url, body) {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || 'request failed');
+      }
       try {
-        const raw = body.dataset.ratingAxes || '[]';
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          ratingAxesData = parsed;
-        }
-      } catch (error) {
-        console.warn('Failed to parse rating_axes metadata', error);
+        return await resp.json();
+      } catch (_) {
+        return {};
       }
-      const ratingAxisMap = new Map(ratingAxesData.map(axis => [Number(axis.axis_id), axis]));
-      const defaultAxisId = Number(body.dataset.defaultAxis || '0');
-      const defaultAxisMax = Number(body.dataset.defaultMax || '5');
+    }
 
-      function parseAxisScores(editor) {
-        if (!editor) {
-          return new Map();
-        }
-        try {
-          const raw = editor.dataset.axisScores || '{}';
-          const parsed = JSON.parse(raw);
-          const result = new Map();
-          if (parsed && typeof parsed === 'object') {
-            Object.entries(parsed).forEach(([key, value]) => {
-              const axisId = Number(key);
-              if (Number.isFinite(axisId)) {
-                result.set(axisId, Number(value) || 0);
-              }
-            });
-          }
-          return result;
-        } catch (error) {
-          console.warn('Failed to parse axis scores', error);
-          return new Map();
-        }
-      }
-
-      function ensureInlineAxes(editor) {
-        if (!editor || editor.dataset.axesReady === '1') {
-          return;
-        }
-        const axesContainer = editor.querySelector('.inline-axes');
-        if (!axesContainer) {
-          editor.dataset.axesReady = '1';
-          return;
-        }
-        const scoreMap = parseAxisScores(editor);
-        const defaultRating = Number(editor.dataset.defaultRating || 0);
-        axesContainer.innerHTML = '';
-        ratingAxesData.forEach(axis => {
-          const axisId = Number(axis.axis_id);
-          const wrapper = document.createElement('label');
-          wrapper.className = 'inline-axis-row';
-          const nameSpan = document.createElement('span');
-          nameSpan.className = 'inline-axis-name';
-          nameSpan.textContent = axis.name;
-          const select = document.createElement('select');
-          select.className = 'inline-axis-select';
-          select.dataset.axisId = String(axisId);
-          select.dataset.max = String(axis.max_score);
-          const maxScore = Number(axis.max_score ?? 0);
-          for (let value = 0; value <= maxScore; value += 1) {
-            const option = document.createElement('option');
-            option.value = String(value);
-            option.textContent = String(value);
-            select.appendChild(option);
-          }
-          const storedScore = scoreMap.has(axisId) ? scoreMap.get(axisId) : (axis.is_default ? defaultRating : 0);
-          select.value = String(Number.isFinite(storedScore) ? storedScore : 0);
-          wrapper.appendChild(nameSpan);
-          wrapper.appendChild(select);
-          axesContainer.appendChild(wrapper);
-        });
-        editor.dataset.axesReady = '1';
-      }
-
-      function submitFilters(form) {
-        const pageInput = form.querySelector('input[name="page"]');
-        if (pageInput) {
-          pageInput.value = '1';
-        }
-        if (typeof form.requestSubmit === 'function') {
-          form.requestSubmit();
-        } else {
-          form.submit();
-        }
-      }
-
-      if (filtersForm) {
-        const perPageSelect = filtersForm.querySelector('#per-page-select');
-        const ratingAxisSelect = filtersForm.querySelector('select[name="rating_axis"]');
-        const ratingValueSelect = filtersForm.querySelector('select[name="rating_value"]');
-        const ratingCompareSelect = filtersForm.querySelector('select[name="rating_compare"]');
-        const includeUnknownCheckbox = filtersForm.querySelector('input[name="include_unknown"]');
-        const tagInput = filtersForm.querySelector('input[name="tag"]');
-        const artistInput = filtersForm.querySelector('input[name="artist"]');
-        const sortSelect = filtersForm.querySelector('select[name="sort"]');
-        const orderSelect = filtersForm.querySelector('select[name="order"]');
-        const displayRadios = Array.from(filtersForm.querySelectorAll('input[name="display"]'));
-        const sizeRadios = Array.from(filtersForm.querySelectorAll('input[name="size"]'));
-
-        const updateOrderDisabled = () => {
-          if (!orderSelect) {
-            return;
-          }
-          const disabled = sortSelect && sortSelect.value === 'random';
-          orderSelect.disabled = disabled;
-          if (orderSelect.parentElement) {
-            orderSelect.parentElement.classList.toggle('field-disabled', disabled);
-          }
-        };
-
-        const updateDisplayDataset = () => {
-          const checked = filtersForm.querySelector('input[name="display"]:checked');
-          const value = checked ? checked.value : 'both';
-          body.dataset.displayMode = value;
-          const displayClass = Array.from(body.classList).find(cls => cls.startsWith('display-'));
-          if (displayClass) { body.classList.remove(displayClass); }
-          body.classList.add(`display-${value}`);
-        };
-
-        const updateSizeDataset = () => {
-          const checked = filtersForm.querySelector('input[name="size"]:checked');
-          const value = checked ? checked.value : 'md';
-          body.dataset.sizeMode = value;
-          const sizeClass = Array.from(body.classList).find(cls => cls.startsWith('size-'));
-          if (sizeClass) { body.classList.remove(sizeClass); }
-          body.classList.add(`size-${value}`);
-        };
-
-        if (displayRadios.length) {
-          updateDisplayDataset();
-          displayRadios.forEach((radio) => {
-            radio.addEventListener('change', () => {
-              updateDisplayDataset();
-              submitFilters(filtersForm);
-            });
-          });
-        }
-
-        if (sizeRadios.length) {
-          updateSizeDataset();
-          sizeRadios.forEach((radio) => {
-            radio.addEventListener('change', () => {
-              updateSizeDataset();
-              submitFilters(filtersForm);
-            });
-          });
-        }
-
-        if (perPageSelect) {
-          perPageSelect.addEventListener('change', () => submitFilters(filtersForm));
-        }
-
-        if (sortSelect) {
-          updateOrderDisabled();
-          sortSelect.addEventListener('change', () => {
-            updateOrderDisabled();
-            submitFilters(filtersForm);
-          });
-        } else {
-          updateOrderDisabled();
-        }
-
-        if (ratingAxisSelect) {
-          ratingAxisSelect.addEventListener('change', () => {
-            if (!ratingAxisSelect.value && ratingValueSelect) {
-              ratingValueSelect.value = '';
-            }
-            submitFilters(filtersForm);
-          });
-        }
-
-        if (ratingValueSelect) {
-          ratingValueSelect.addEventListener('change', () => submitFilters(filtersForm));
-        }
-
-        if (ratingCompareSelect) {
-          ratingCompareSelect.addEventListener('change', () => submitFilters(filtersForm));
-        }
-
-        if (includeUnknownCheckbox) {
-          includeUnknownCheckbox.addEventListener('change', () => submitFilters(filtersForm));
-        }
-
-        const resetButton = document.getElementById('reset-button');
-        if (resetButton) {
-          resetButton.addEventListener('click', () => {
-            window.location.href = window.location.pathname;
-          });
-        }
-
-        document.addEventListener('click', event => {
-          const expandButton = event.target.closest('[data-expand-tags]');
-          if (expandButton) {
-            event.preventDefault();
-            const panel = expandButton.closest('[data-tag-panel]');
-            const container = panel ? panel.querySelector('[data-scrollable="list"]') : null;
-            if (container) {
-              const expanded = container.dataset.expanded === 'true';
-              container.dataset.expanded = expanded ? 'false' : 'true';
-              updateTagPanelState(container);
-            }
-            return;
-          }
-          const tagButton = event.target.closest('[data-filter-tag]');
-          if (tagButton && tagInput) {
-            event.preventDefault();
-            tagInput.value = tagButton.dataset.filterTag || tagButton.textContent || '';
-            submitFilters(filtersForm);
-            return;
-          }
-          const artistButton = event.target.closest('[data-filter-artist]');
-          if (artistButton && artistInput) {
-            event.preventDefault();
-            artistInput.value = artistButton.dataset.filterArtist || artistButton.textContent || '';
-            submitFilters(filtersForm);
-          }
-        });
-      }
-
-      const refreshButton = document.getElementById('refresh-button');
-      if (refreshButton) {
-        refreshButton.addEventListener('click', () => window.location.reload());
-      }
-
-      const sidebarToggle = document.getElementById('toggle-sidebar-visibility');
-      const restoreSidebarBtn = document.getElementById('restore-sidebar');
-
-      const showSidebar = () => {
-        delete body.dataset.sidebar;
-        if (sidebarToggle) {
-          const hideLabel = sidebarToggle.dataset.hideLabel || '繧ｵ繧､繝峨ヰ繝ｼ繧帝國縺・;
-          sidebarToggle.textContent = hideLabel;
-        }
-      };
-
-      const hideSidebar = () => {
-        body.dataset.sidebar = 'hidden';
-        if (sidebarToggle) {
-          const showLabel = sidebarToggle.dataset.showLabel || '繧ｵ繧､繝峨ヰ繝ｼ繧定｡ｨ遉ｺ';
-          sidebarToggle.textContent = showLabel;
-        }
-      };
-
-      sidebarToggle?.addEventListener('click', () => {
-        const hidden = body.dataset.sidebar === 'hidden';
-        if (hidden) {
-          showSidebar();
-        } else {
-          hideSidebar();
-        }
-      });
-
-      restoreSidebarBtn?.addEventListener('click', () => {
-        showSidebar();
-        sidebarToggle?.focus();
-      });
-
-      showSidebar();
-
-      const logsModal = document.getElementById('log-modal');
-      const logsBackdrop = document.getElementById('log-backdrop');
-      const logsList = document.getElementById('log-entries');
-      const toggleLogsButton = document.getElementById('toggle-logs');
-      const refreshLogsButton = document.getElementById('refresh-logs');
-      const closeLogsButton = document.getElementById('close-log-modal');
-
-      function escapeHtml(value) {
-        return value
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      }
-
-      function formatLogEntry(entry) {
-        if (entry == null) {
-          return '';
-        }
-        if (typeof entry === 'string') {
-          return `<span class="log-msg">${escapeHtml(entry)}</span>`;
-        }
-        if (typeof entry === 'object') {
-          const rawTimestamp = entry.timestamp || entry.time || '';
-          let formattedTime = '';
-          if (rawTimestamp) {
-            const parsed = new Date(rawTimestamp);
-            if (!Number.isNaN(parsed.getTime())) {
-              formattedTime = parsed.toLocaleString('ja-JP', { hour12: false });
-            } else {
-              formattedTime = rawTimestamp;
-            }
-          }
-          const level = entry.level || '';
-          const loggerName = entry.name || '';
-          let message = entry.message;
-          if (typeof message !== 'string') {
-            message = message != null ? JSON.stringify(message) : '';
-          }
-          const metaParts = [formattedTime, level, loggerName].filter(Boolean).map(escapeHtml);
-          const metaHtml = metaParts.length ? `<span class="log-meta">${metaParts.join(' ')}</span>` : '';
-          const msgHtml = `<span class="log-msg">${escapeHtml(message).replace(/\n/g, '<br>')}</span>`;
-          return `${metaHtml} ${msgHtml}`.trim();
-        }
-        return `<span class="log-msg">${escapeHtml(String(entry))}</span>`;
-      }
-
-      async function loadLogs() {
-        if (!logsList) {
-          return;
-        }
-        try {
-          const response = await fetch('/api/logs?limit=200');
-          if (!response.ok) {
-            throw new Error('failed to fetch logs');
-          }
-          const data = await response.json();
-          const entries = Array.isArray(data.logs) ? data.logs : [];
-          logsList.innerHTML = entries
-            .map(item => `<li>${formatLogEntry(item)}</li>`)
-            .join('');
-        } catch (error) {
-          console.error(error);
-          logsList.innerHTML = '<li>繝ｭ繧ｰ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆</li>';
-        }
-      }
-
+    function bindSyncControls() {
+      const syncButton = document.getElementById('sync-now-button');
       const syncStatus = document.getElementById('sync-status');
       const metadataStatus = document.getElementById('metadata-status');
-      const maintenanceStatus = document.getElementById('maintenance-status');
-      const syncButton = document.getElementById('sync-now-button');
-      const verifyFilesButton = document.getElementById('verify-files-button');
-      const verifyBookmarksButton = document.getElementById('verify-bookmarks-button');
-
-      async function updateMaintenanceStatus() {
-        if (!maintenanceStatus) {
-          return;
-        }
-        try {
-          const response = await fetch('/api/maintenance/status');
-          if (!response.ok) {
-            throw new Error('failed to fetch maintenance status');
-          }
-          const data = await response.json();
-          const running = Boolean(data.running);
-          const task = typeof data.task === 'string' ? data.task : null;
-          const taskLabel = task === 'bookmarks' ? '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷・ : '謨ｴ蜷域ｧ繝√ぉ繝・け';
-          const checked = Number(data.checked || 0);
-          const missing = Number(data.missing || 0);
-          const repaired = Number(data.repaired || 0);
-          const failed = Number(data.failed || 0);
-
-          if (verifyFilesButton) {
-            const runningThis = running && task === 'files';
-            verifyFilesButton.disabled = running;
-            if (runningThis) {
-              verifyFilesButton.textContent = '繝√ぉ繝・け荳ｭ窶ｦ';
-            } else if (running) {
-              verifyFilesButton.textContent = '莉悶・蜃ｦ逅・ｒ螳溯｡御ｸｭ窶ｦ';
-            } else {
-              verifyFilesButton.textContent = '謨ｴ蜷域ｧ繝√ぉ繝・け繧貞ｮ溯｡・;
-            }
-          }
-          if (verifyBookmarksButton) {
-            const runningThis = running && task === 'bookmarks';
-            verifyBookmarksButton.disabled = running;
-            if (runningThis) {
-              verifyBookmarksButton.textContent = '繝√ぉ繝・け荳ｭ窶ｦ';
-            } else if (running) {
-              verifyBookmarksButton.textContent = '莉悶・蜃ｦ逅・ｒ螳溯｡御ｸｭ窶ｦ';
-            } else {
-              verifyBookmarksButton.textContent = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ螳溯｡・;
-            }
-          }
-
-          let message;
-          if (running) {
-            message = `${taskLabel}繧貞ｮ溯｡御ｸｭ窶ｦ 遒ｺ隱肴ｸ医∩ ${checked} 莉ｶ / 谺關ｽ ${missing} 莉ｶ / 蜀榊叙蠕・${repaired} 莉ｶ`;
-            if (failed) {
-              message += ` / 螟ｱ謨・${failed} 莉ｶ`;
-            }
-          } else if (data.last_finished_at) {
-            const finishedAt = String(data.last_finished_at).replace('T', ' ');
-            message = `${taskLabel}縺ｮ譛邨ょｮ溯｡・ ${finishedAt} / 遒ｺ隱肴ｸ医∩ ${checked} 莉ｶ`;
-            if (missing || repaired || failed) {
-              message += ` / 谺關ｽ ${missing} 莉ｶ / 蜀榊叙蠕・${repaired} 莉ｶ`;
-              if (failed) {
-                message += ` / 螟ｱ謨・${failed} 莉ｶ`;
-              }
-            } else {
-              message += ' / 蝠城｡後・隕九▽縺九ｊ縺ｾ縺帙ｓ縺ｧ縺励◆';
-            }
-          } else if (data.last_started_at) {
-            const startedAt = String(data.last_started_at).replace('T', ' ');
-            message = `${taskLabel}縺ｮ蜑榊屓髢句ｧ・ ${startedAt}`;
-          } else {
-            message = `${taskLabel}縺ｯ縺ｾ縺螳溯｡後＆繧後※縺・∪縺帙ｓ`;
-          }
-          if (data.message) {
-            message += `\n${data.message}`;
-          }
-          maintenanceStatus.textContent = message;
-        } catch (error) {
-          console.error(error);
-          maintenanceStatus.textContent = '繝｡繝ｳ繝・リ繝ｳ繧ｹ繧ｹ繝・・繧ｿ繧ｹ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆';
-          if (verifyFilesButton) {
-            verifyFilesButton.disabled = false;
-            verifyFilesButton.textContent = '謨ｴ蜷域ｧ繝√ぉ繝・け繧貞ｮ溯｡・;
-          }
-          if (verifyBookmarksButton) {
-            verifyBookmarksButton.disabled = false;
-            verifyBookmarksButton.textContent = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ螳溯｡・;
-          }
-        }
-      }
-
-      verifyFilesButton?.addEventListener('click', async () => {
-        if (!verifyFilesButton || verifyFilesButton.disabled) {
-          return;
-        }
-        const originalText = verifyFilesButton.textContent || '謨ｴ蜷域ｧ繝√ぉ繝・け繧貞ｮ溯｡・;
-        verifyFilesButton.disabled = true;
-        verifyFilesButton.textContent = '繝√ぉ繝・け繧帝幕蟋九＠縺ｦ縺・∪縺吮ｦ';
-        if (maintenanceStatus) {
-          maintenanceStatus.textContent = '謨ｴ蜷域ｧ繝√ぉ繝・け繧帝幕蟋九＠縺ｦ縺・∪縺吮ｦ';
-        }
-        try {
-          const response = await fetch('/api/maintenance/verify-files', { method: 'POST' });
-          if (!response.ok) {
-            let message = '謨ｴ蜷域ｧ繝√ぉ繝・け縺ｮ髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
-            try {
-              const data = await response.json();
-              if (data && data.message) {
-                message = data.message;
-              }
-            } catch (parseError) {
-              // ignore JSON parse errors
-            }
-            throw new Error(message);
-          }
-        } catch (error) {
-          console.error(error);
-          verifyFilesButton.disabled = false;
-          verifyFilesButton.textContent = originalText;
-          if (maintenanceStatus) {
-            maintenanceStatus.textContent = error.message || '謨ｴ蜷域ｧ繝√ぉ繝・け縺ｮ髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
-          }
-        } finally {
-          await updateMaintenanceStatus();
-          if (verifyFilesButton && !verifyFilesButton.disabled) {
-            verifyFilesButton.textContent = originalText;
-          }
-        }
-      });
-
-      verifyBookmarksButton?.addEventListener('click', async () => {
-        if (!verifyBookmarksButton || verifyBookmarksButton.disabled) {
-          return;
-        }
-        const originalText = verifyBookmarksButton.textContent || '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ螳溯｡・;
-        verifyBookmarksButton.disabled = true;
-        verifyBookmarksButton.textContent = '繝√ぉ繝・け繧帝幕蟋九＠縺ｦ縺・∪縺吮ｦ';
-        if (maintenanceStatus) {
-          maintenanceStatus.textContent = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医ｒ髢句ｧ九＠縺ｦ縺・∪縺吮ｦ';
-        }
-        try {
-          const response = await fetch('/api/maintenance/verify-bookmarks', { method: 'POST' });
-          if (!response.ok) {
-            let message = '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医・髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
-            try {
-              const data = await response.json();
-              if (data && data.message) {
-                message = data.message;
-              }
-            } catch (parseError) {
-              // ignore JSON parse errors
-            }
-            throw new Error(message);
-          }
-        } catch (error) {
-          console.error(error);
-          verifyBookmarksButton.disabled = false;
-          verifyBookmarksButton.textContent = originalText;
-          if (maintenanceStatus) {
-            maintenanceStatus.textContent = error.message || '繝悶ャ繧ｯ繝槭・繧ｯ辣ｧ蜷医・髢句ｧ九↓螟ｱ謨励＠縺ｾ縺励◆';
-          }
-        } finally {
-          await updateMaintenanceStatus();
-          if (verifyBookmarksButton && !verifyBookmarksButton.disabled) {
-            verifyBookmarksButton.textContent = originalText;
-          }
-        }
-      });
-      async function updateSyncStatus() {
-        if (!syncStatus) {
-          return;
-        }
-        try {
-          const response = await fetch('/api/sync/status');
-          if (!response.ok) {
-            throw new Error('status fetch failed');
-          }
-          const data = await response.json();
-          if (data.in_progress) {
-            syncStatus.textContent = '蜷梧悄繧貞ｮ溯｡御ｸｭ縺ｧ縺吮ｦ';
-          } else if (data.last_finished_at) {
-            syncStatus.textContent = `譛邨ょ酔譛・ ${String(data.last_finished_at).replace('T', ' ')}`;
-          } else if (data.last_started_at) {
-            syncStatus.textContent = `譛蠕後・髢句ｧ・ ${String(data.last_started_at).replace('T', ' ')}`;
-          } else {
-            syncStatus.textContent = '蜷梧悄蠕・■縺ｧ縺・;
-          }
-          if (metadataStatus) {
-            const pending = Number(data.pending_metadata) || 0;
-            metadataStatus.dataset.pending = String(pending);
-            metadataStatus.textContent = pending
-              ? `荳崎ｶｳ繝｡繧ｿ繝・・繧ｿ: 谿九ｊ ${pending} 莉ｶ`
-              : '繝｡繧ｿ繝・・繧ｿ縺ｯ譛譁ｰ縺ｧ縺・;
-          }
-        } catch (error) {
-          console.error(error);
-          syncStatus.textContent = '蜷梧悄繧ｹ繝・・繧ｿ繧ｹ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆';
-        }
-      }
-
       if (syncButton) {
-        const originalText = syncButton.textContent || '莉翫☆縺仙・蜿門ｾ・;
         syncButton.addEventListener('click', async () => {
           syncButton.disabled = true;
-          syncButton.textContent = '蜀榊叙蠕苓ｦ∵ｱゆｸｭ窶ｦ';
+          if (syncStatus) syncStatus.textContent = '同期をリクエストしています…';
           try {
-            const response = await fetch('/api/sync/start', { method: 'POST' });
-            if (!response.ok) {
-              throw new Error('failed to start sync');
-            }
-            syncButton.textContent = '蜀榊叙蠕励ｒ隕∵ｱゅ＠縺ｾ縺励◆';
-            await updateSyncStatus();
+            await postJSON('/api/sync/start', {});
+            toast('同期処理を開始しました');
           } catch (error) {
             console.error(error);
-            syncButton.textContent = '蜀榊叙蠕励↓螟ｱ謨励＠縺ｾ縺励◆';
+            if (syncStatus) syncStatus.textContent = '同期の開始に失敗しました';
           } finally {
-            setTimeout(() => {
-              syncButton.disabled = false;
-              syncButton.textContent = originalText;
-            }, 4000);
+            syncButton.disabled = false;
           }
         });
       }
 
-      updateSyncStatus();
-      updateMaintenanceStatus();
-      setInterval(updateSyncStatus, 15000);
-      setInterval(updateMaintenanceStatus, 15000);
-
-      function renderBadge(badge) {
-        if (!badge) {
-          return;
-        }
-        const output = badge.querySelector('.rating-output');
-        const gauge = badge.querySelector('.rating-gauge');
-        const fill = badge.querySelector('.rating-gauge-fill');
-        const rawScore = Number(badge.dataset.score ?? '0');
-        const rawMax = Number(badge.dataset.max ?? '5');
-        const max = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 1;
-        const mode = badge.dataset.displayMode || 'stars';
-        const safeScore = Number.isFinite(rawScore) ? rawScore : 0;
-        const score = Math.max(0, Math.min(max, Math.round(safeScore)));
-        const ratio = Math.max(0, Math.min(1, score / max));
-        if (fill) {
-          fill.style.width = `${Math.round(ratio * 100)}%`;
-        }
-        if (gauge) {
-          gauge.style.display = mode === 'bar' ? 'block' : 'none';
-        }
-        const modeClasses = ['stars', 'circles', 'squares', 'numeric', 'bar'];
-        modeClasses.forEach(name => {
-          badge.classList.toggle(`mode-${name}`, mode === name);
-        });
-        const isStarMode = mode === 'stars';
-        badge.classList.toggle('quick-rate', isStarMode);
-        if (!isStarMode) {
-          badge.classList.remove('is-pending');
-        }
-        if (!output) {
-          return;
-        }
-        let text;
-        switch (mode) {
-          case 'stars': {
-            const empty = Math.max(0, max - score);
-            text = '笘・.repeat(score) + '笘・.repeat(empty);
-            break;
-          }
-          case 'circles': {
-            const empty = Math.max(0, max - score);
-            text = '笳・.repeat(score) + '笳・.repeat(empty);
-            break;
-          }
-          case 'squares': {
-            const empty = Math.max(0, max - score);
-            text = '笆'.repeat(score) + '笆｡'.repeat(empty);
-            break;
-          }
-          case 'bar':
-            text = `${Math.round(ratio * 100)}%`;
-            break;
-          case 'numeric':
-          default:
-            text = `${score} / ${max}`;
-            break;
-        }
-        output.textContent = text;
-      }
-
-      function renderAllBadges() {
-        document.querySelectorAll('[data-rating-badge]').forEach(renderBadge);
-      }
-
-      const quickRatingPending = new Set();
-
-      function getAxisBadges(illustId, axisId) {
-        return Array.from(
-          document.querySelectorAll(`[data-rating-badge][data-illust-id="${illustId}"]`)
-        ).filter(badge => Number(badge.dataset.axisId) === axisId);
-      }
-
-      function parseCustomTagsValue(value) {
-        if (!value) {
-          return [];
-        }
-        return value
-          .split(',')
-          .map(tag => tag.trim())
-          .filter(Boolean);
-      }
-
-      function getCustomTagsForIllust(illustId) {
-        const editor = document.querySelector(`[data-inline-editor][data-illust-id="${illustId}"]`);
-        if (editor) {
-          return parseCustomTagsValue(editor.dataset.customTags || '');
-        }
-        const tagSource =
-          document.querySelector(`[data-tags][data-illust-id="${illustId}"]`) ||
-          document.querySelector(`[data-info][data-illust-id="${illustId}"]`) ||
-          document.querySelector(`[data-overlay-tags][data-illust-id="${illustId}"]`);
-        if (tagSource && typeof tagSource.dataset.customTags !== 'undefined') {
-          return parseCustomTagsValue(tagSource.dataset.customTags || '');
-        }
-        return [];
-      }
-
-      function updateInlineAxisSelects(editor, axisId, score) {
-        if (!editor) {
-          return;
-        }
-        editor
-          .querySelectorAll(`.inline-axis-select[data-axis-id="${axisId}"]`)
-          .forEach(select => {
-            select.value = String(score);
-          });
-      }
-
-      async function submitQuickRating(illustId, axisId, score, previousScore) {
-        const key = `${illustId}:${axisId}`;
-        if (quickRatingPending.has(key)) {
-          return;
-        }
-        quickRatingPending.add(key);
-
-        const editor = document.querySelector(`[data-inline-editor][data-illust-id="${illustId}"]`);
-        const statusLabel = editor?.querySelector('.inline-status') || null;
-        const previousAxisScoresJson = editor ? editor.dataset.axisScores : null;
-        const previousDefaultRating = editor ? editor.dataset.defaultRating : null;
-
-        const defaultBadge = document.querySelector(
-          `[data-rating-badge][data-illust-id="${illustId}"][data-axis-id="${defaultAxisId}"]`
-        );
-        let defaultScoreBefore = Number(defaultBadge?.dataset.score ?? previousDefaultRating ?? 0);
-        if (!Number.isFinite(defaultScoreBefore)) {
-          defaultScoreBefore = 0;
-        }
-
-        const badges = getAxisBadges(illustId, axisId);
-        const previousScores = new Map(badges.map(b => [b, b.dataset.score]));
-
-        badges.forEach(badge => {
-          badge.dataset.score = String(score);
-          badge.classList.add('is-pending');
-          renderBadge(badge);
-        });
-
-        const customTags = getCustomTagsForIllust(illustId);
-
-        let scoreMap = new Map();
-        if (editor) {
-          scoreMap = parseAxisScores(editor);
-          scoreMap.set(axisId, score);
-          updateInlineAxisSelects(editor, axisId, score);
-          if (axisId === defaultAxisId) {
-            editor.dataset.defaultRating = String(score);
-          }
-          try {
-            editor.dataset.axisScores = JSON.stringify(Object.fromEntries(scoreMap));
-          } catch (error) {
-            console.warn('Failed to serialize axis scores', error);
-          }
-        }
-
-        const payloadAxes = [{ axis_id: axisId, score }];
-        if (axisId !== defaultAxisId) {
-          payloadAxes.push({ axis_id: defaultAxisId, score: defaultScoreBefore });
-        }
-        const payload = {
-          custom_tags: customTags,
-          rating: axisId === defaultAxisId ? score : defaultScoreBefore,
-          axes: payloadAxes,
-        };
-
-        if (statusLabel) {
-          statusLabel.textContent = '菫晏ｭ倅ｸｭ窶ｦ';
-        }
-
+      async function refreshSyncStatus() {
         try {
-          const response = await fetch(`/api/illust/${illustId}/meta`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (!response.ok) {
-            throw new Error('failed to update rating');
+          const resp = await fetch('/api/sync/status');
+          if (!resp.ok) throw new Error('status failed');
+          const data = await resp.json();
+          if (syncStatus) {
+            if (data.in_progress) {
+              syncStatus.textContent = '同期中 (サイクル #' + (data.last_cycle || 0) + ')';
+            } else if (data.last_finished_at) {
+              syncStatus.textContent = '前回: ' + new Date(data.last_finished_at).toLocaleString();
+            } else {
+              syncStatus.textContent = '同期は待機中です';
+            }
           }
-          const result = await response.json();
-          updateCardAfterSave(illustId, result);
-          if (statusLabel) {
-            statusLabel.textContent = '菫晏ｭ倥＠縺ｾ縺励◆';
-            setTimeout(() => {
-              if (statusLabel.textContent === '菫晏ｭ倥＠縺ｾ縺励◆') {
-                statusLabel.textContent = '';
-              }
-            }, 2500);
+          if (metadataStatus) {
+            const pending = Number(data.pending_metadata || 0);
+            metadataStatus.dataset.pending = String(pending);
+            metadataStatus.textContent = pending ? `メタデータ: 残り ${pending} 件` : 'メタデータは最新です';
           }
         } catch (error) {
           console.error(error);
-          badges.forEach(badge => {
-            const fallback = previousScores.get(badge);
-            badge.dataset.score = typeof fallback !== 'undefined' ? fallback : String(previousScore);
-            renderBadge(badge);
-          });
-          if (editor) {
-            if (previousAxisScoresJson != null) {
-              editor.dataset.axisScores = previousAxisScoresJson;
-            }
-            if (previousDefaultRating != null) {
-              editor.dataset.defaultRating = previousDefaultRating;
-            }
-            updateInlineAxisSelects(editor, axisId, previousScore);
-          }
-          if (statusLabel) {
-            statusLabel.textContent = '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆';
-            setTimeout(() => {
-              if (statusLabel.textContent === '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆') {
-                statusLabel.textContent = '';
-              }
-            }, 4000);
-          }
+          if (syncStatus) syncStatus.textContent = '同期状態の取得に失敗しました';
+        }
+      }
+
+      refreshSyncStatus();
+      setInterval(refreshSyncStatus, 30000);
+    }
+
+    function bindMaintenanceControls() {
+      const filesButton = document.getElementById('verify-files-button');
+      const bookmarksButton = document.getElementById('verify-bookmarks-button');
+      const statusLabel = document.getElementById('maintenance-status');
+
+      async function runTask(button, url, runningText) {
+        if (!button) return;
+        button.disabled = true;
+        if (statusLabel) statusLabel.textContent = runningText;
+        try {
+          await postJSON(url, {});
+          if (statusLabel) statusLabel.textContent = 'タスクを受け付けました。完了までしばらくお待ちください。';
+        } catch (error) {
+          console.error(error);
+          if (statusLabel) statusLabel.textContent = error.message || 'タスクの開始に失敗しました';
         } finally {
-          quickRatingPending.delete(key);
-          badges.forEach(badge => badge.classList.remove('is-pending'));
+          button.disabled = false;
         }
       }
 
-      function bindQuickRatingBadges() {
-        document.querySelectorAll('[data-rating-badge]').forEach(badge => {
-          if (badge.dataset.quickRateBound === '1') {
-            return;
+      filesButton?.addEventListener('click', () => runTask(filesButton, '/api/maintenance/verify-files', 'ファイル検証を開始しています…'));
+      bookmarksButton?.addEventListener('click', () => runTask(bookmarksButton, '/api/maintenance/verify-bookmarks', 'ブックマーク検証を開始しています…'));
+    }
+
+    function bindRecentControls() {
+      const button = document.getElementById('fetch-recent-button');
+      const limitInput = document.getElementById('fetch-recent-limit');
+      const statusLabel = document.getElementById('recent-status');
+      if (!button || !limitInput || !statusLabel) return;
+
+      button.addEventListener('click', async () => {
+        const limit = Math.min(500, Math.max(1, Number(limitInput.value) || 100));
+        button.disabled = true;
+        statusLabel.textContent = `最新ブクマを ${limit} 件取得しています…`;
+        try {
+          const resp = await postJSON('/api/recent/fetch', { limit });
+          if (resp && resp.ok === false && resp.message) {
+            statusLabel.textContent = resp.message;
+          } else {
+            statusLabel.textContent = `最新ブクマの取得を要求しました (${limit} 件)`;
           }
-          const mode = (badge.dataset.displayMode || '').toLowerCase();
-          if (mode !== 'stars') {
-            return;
+        } catch (error) {
+          console.error(error);
+          statusLabel.textContent = '最新ブクマの取得に失敗しました';
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      async function refreshRecentStatus() {
+        try {
+          const resp = await fetch('/api/recent/status');
+          if (!resp.ok) throw new Error('recent status failed');
+          const data = await resp.json();
+          if (data.running) {
+            statusLabel.textContent = '最新ブックマークを取得中です…';
+          } else if (data.last_finished_at) {
+            statusLabel.textContent = '最新ブクマ完了: ' + new Date(data.last_finished_at).toLocaleString();
+          } else {
+            statusLabel.textContent = '最新ブックマーク取得は待機中です';
           }
-          badge.dataset.quickRateBound = '1';
-          badge.addEventListener('click', event => {
-            const currentMode = (badge.dataset.displayMode || '').toLowerCase();
-            if (currentMode !== 'stars') {
-              return;
-            }
-            const illustId = Number(badge.dataset.illustId);
-            const axisId = Number(badge.dataset.axisId);
-            let max = Number(badge.dataset.max ?? defaultAxisMax ?? 5);
-            if (!Number.isFinite(max) || max <= 0) {
-              max = 5;
-            }
-            if (!Number.isFinite(illustId) || !Number.isFinite(axisId)) {
-              return;
-            }
-            const output = badge.querySelector('.rating-output');
-            let rect = output?.getBoundingClientRect?.();
-            if (!rect || rect.width <= 0) {
-              rect = badge.getBoundingClientRect();
-            }
-            if (!rect || rect.width <= 0) {
-              return;
-            }
-            let clientX = Number(event.clientX);
-            if (!Number.isFinite(clientX) && event.changedTouches && event.changedTouches.length) {
-              clientX = event.changedTouches[0].clientX;
-            }
-            if (!Number.isFinite(clientX)) {
-              return;
-            }
-            let relativeX = clientX - rect.left;
-            if (!Number.isFinite(relativeX)) {
-              return;
-            }
-            relativeX = Math.min(Math.max(relativeX, 0), rect.width);
-            const ratio = rect.width > 0 ? Math.min(Math.max(relativeX / rect.width, 0), 1) : 0;
-            let nextScore = Math.ceil(ratio * max);
-            if (event.shiftKey) {
-              nextScore = 0;
-            }
-            nextScore = Math.max(0, Math.min(max, nextScore));
-            const currentScore = Number(badge.dataset.score || '0');
-            if (!Number.isFinite(nextScore) || (!event.shiftKey && nextScore === currentScore)) {
-              return;
-            }
-            submitQuickRating(illustId, axisId, nextScore, currentScore);
-          });
-        });
+        } catch (error) {
+          console.error(error);
+          statusLabel.textContent = '最新ブクマ状態の取得に失敗しました';
+        }
       }
 
-      function renderTagButtons(container, pixivTags, customTags) {
-        if (!container) {
-          return;
-        }
-        container.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-        pixivTags.forEach(tag => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'tag-button';
-          button.dataset.filterTag = tag;
-          button.textContent = tag;
-          fragment.appendChild(button);
-        });
-        customTags.forEach(tag => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'tag-button custom';
-          button.dataset.filterTag = tag;
-          button.textContent = `#${tag}`;
-          fragment.appendChild(button);
-        });
-        container.appendChild(fragment);
-        const total = pixivTags.length + customTags.length;
-        container.dataset.tagCount = String(total);
-        if (!container.dataset.expanded) {
-          container.dataset.expanded = 'false';
-        }
-        updateTagPanelState(container);
-      }
+      refreshRecentStatus();
+      setInterval(refreshRecentStatus, 30000);
+    }
 
-      function renderOverlayTagButtons(container, pixivTags, customTags) {
-        if (!container) {
-          return;
-        }
-        container.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-        pixivTags.forEach(tag => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'overlay-tag';
-          button.dataset.filterTag = tag;
-          button.textContent = tag;
-          fragment.appendChild(button);
-        });
-        customTags.forEach(tag => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'overlay-tag custom';
-          button.dataset.filterTag = tag;
-          button.textContent = `#${tag}`;
-          fragment.appendChild(button);
-        });
-        container.appendChild(fragment);
-      }
-
-      function updateTagPanelState(container) {
-        const panel = container.closest('[data-tag-panel]');
-        if (!panel) {
-          return;
-        }
-        const expandButton = panel.querySelector('[data-expand-tags]');
-        const threshold = Number(panel.dataset.threshold || '12');
-        const total = Number(container.dataset.tagCount || '0');
-        const expanded = container.dataset.expanded === 'true';
-        panel.dataset.expanded = expanded ? 'true' : 'false';
-        if (!expandButton) {
-          return;
-        }
-        if (total > threshold) {
-          expandButton.hidden = false;
-          expandButton.textContent = expanded ? '繧ｿ繧ｰ繧呈釜繧翫◆縺溘・' : '繧ｿ繧ｰ繧偵☆縺ｹ縺ｦ陦ｨ遉ｺ';
+    function bindSidebarToggle() {
+      const body = document.body;
+      const toggle = document.getElementById('toggle-sidebar-visibility');
+      if (!toggle) return;
+      toggle.addEventListener('click', () => {
+        const hidden = body.dataset.sidebar === 'hidden';
+        if (hidden) {
+          delete body.dataset.sidebar;
+          toggle.textContent = toggle.dataset.hideLabel || 'サイドバーを隠す';
         } else {
-          expandButton.hidden = true;
-          container.dataset.expanded = 'true';
-          panel.dataset.expanded = 'true';
+          body.dataset.sidebar = 'hidden';
+          toggle.textContent = toggle.dataset.showLabel || 'サイドバーを表示';
         }
-      }
+      });
+    }
 
-      function initializeTagPanels() {
-        document.querySelectorAll('[data-tags]').forEach(container => {
-          if (!container.dataset.tagCount) {
-            const total = container.querySelectorAll('button').length;
-            container.dataset.tagCount = String(total);
-          }
-          if (!container.dataset.expanded) {
-            container.dataset.expanded = 'false';
-          }
-          updateTagPanelState(container);
-        });
-      }
-
-      function updateCardAfterSave(illustId, payload) {
-        const axes = Array.isArray(payload.axes) ? payload.axes : [];
-        const customTags = Array.isArray(payload.custom_tags) ? payload.custom_tags : [];
-        const scoreMapPayload = {};
-        axes.forEach(item => {
-          if (item && typeof item.axis_id !== 'undefined') {
-            scoreMapPayload[item.axis_id] = Number(item.score || 0);
-          }
-        });
-        const editor = document.querySelector(`[data-inline-editor][data-illust-id="${illustId}"]`);
-        if (editor) {
-          editor.dataset.axisScores = JSON.stringify(scoreMapPayload);
-          if (typeof scoreMapPayload[defaultAxisId] !== 'undefined') {
-            editor.dataset.defaultRating = String(scoreMapPayload[defaultAxisId]);
-          } else if (typeof payload.rating !== 'undefined') {
-            editor.dataset.defaultRating = String(Number(payload.rating) || 0);
-          }
-          editor.dataset.customTags = customTags.join(', ');
-        }
-        document
-          .querySelectorAll(`[data-inline-editor][data-illust-id="${illustId}"] .inline-tags-input`)
-          .forEach(input => {
-            input.value = customTags.join(', ');
-          });
-
-        document
-          .querySelectorAll(`[data-inline-editor][data-illust-id="${illustId}"] .inline-axis-select`)
-          .forEach(select => {
-            const axisId = Number(select.dataset.axisId);
-            const axis = axes.find(item => Number(item.axis_id) === axisId);
-            if (axis) {
-              select.value = String(axis.score ?? 0);
-            }
-          });
-
-        // Re-render every rating badge attached to the illustration so new scores become visible.
-        document
-          .querySelectorAll(`[data-rating-badge][data-illust-id="${illustId}"]`)
-          .forEach(badge => {
-            const axisId = Number(badge.dataset.axisId);
-            let axisData = axes.find(item => Number(item.axis_id) === axisId);
-            if (!axisData) {
-              axisData = axes.find(item => item.is_default);
-            }
-            if (!axisData) {
-              const mapped = ratingAxisMap.get(axisId) || ratingAxisMap.get(defaultAxisId);
-              if (mapped) {
-                axisData = {
-                  axis_id: mapped.axis_id,
-                  score: axisId === mapped.axis_id ? Number(badge.dataset.score || 0) : 0,
-                  max_score: mapped.max_score,
-                  display_mode: mapped.display_mode,
-                };
-              }
-            }
-            if (axisData) {
-              if (axisData.max_score != null) {
-                badge.dataset.max = String(axisData.max_score);
-              }
-              if (axisData.display_mode) {
-                badge.dataset.displayMode = axisData.display_mode;
-              }
-              badge.dataset.score = String(axisData.score ?? 0);
-              renderBadge(badge);
-            }
-          });
-
-        document
-          .querySelectorAll(`.axis-chip[data-illust-id="${illustId}"]`)
-          .forEach(chip => {
-            const axisId = Number(chip.dataset.axisId);
-            const axisData = axes.find(item => Number(item.axis_id) === axisId);
-            if (!axisData) {
-              return;
-            }
-            const chipLabel = chip.querySelector('.axis-chip-label');
-            if (chipLabel) {
-              chipLabel.textContent = axisData.name;
-            }
-            const axisBadge = chip.querySelector('[data-rating-badge]');
-            if (axisBadge) {
-              axisBadge.dataset.score = String(axisData.score ?? 0);
-              if (axisData.max_score != null) {
-                axisBadge.dataset.max = String(axisData.max_score);
-              }
-              if (axisData.display_mode) {
-                axisBadge.dataset.displayMode = axisData.display_mode;
-              }
-              renderBadge(axisBadge);
-            }
-          });
-
-        document
-          .querySelectorAll(`[data-tags][data-illust-id="${illustId}"]`)
-          .forEach(container => {
-            const pixivTags = (container.dataset.pixivTags || '')
-              .split(',')
-              .map(tag => tag.trim())
-              .filter(Boolean);
-            container.dataset.customTags = customTags.join(', ');
-            renderTagButtons(container, pixivTags, customTags);
-            updateTagPanelState(container);
-          });
-
-        document
-          .querySelectorAll(`[data-overlay-tags][data-illust-id="${illustId}"]`)
-          .forEach(container => {
-            const pixivTags = (container.dataset.pixivTags || '')
-              .split(',')
-              .map(tag => tag.trim())
-              .filter(Boolean);
-            container.dataset.customTags = customTags.join(', ');
-            renderOverlayTagButtons(container, pixivTags, customTags);
-          });
-
-        bindQuickRatingBadges();
-      }
-
-      function bindInlineEditors() {
-        document.querySelectorAll('[data-inline-editor]').forEach(editor => {
-          const toggleButton = editor.querySelector('.inline-toggle');
-          const bodySection = editor.querySelector('.inline-body');
-          const saveButton = editor.querySelector('.inline-save');
-          const statusLabel = editor.querySelector('.inline-status');
-          const tagsInput = editor.querySelector('.inline-tags-input');
-          const collapsedLabel = toggleButton?.dataset.collapsedLabel || '繧ｯ繧､繝・け邱ｨ髮・;
-          const expandedLabel = toggleButton?.dataset.expandedLabel || '髢峨§繧・;
-
-          if (tagsInput && editor.dataset.customTags && !tagsInput.dataset.initialized) {
-            tagsInput.value = editor.dataset.customTags;
-            tagsInput.dataset.initialized = '1';
-          }
-
-          const openEditor = () => {
-            ensureInlineAxes(editor);
-            if (bodySection) {
-              bodySection.removeAttribute('hidden');
-            }
-            if (toggleButton) {
-              toggleButton.textContent = expandedLabel;
-              toggleButton.dataset.state = 'open';
-            }
-          };
-
-          const closeEditor = () => {
-            if (bodySection) {
-              bodySection.setAttribute('hidden', '');
-            }
-            if (toggleButton) {
-              toggleButton.textContent = collapsedLabel;
-              toggleButton.dataset.state = 'closed';
-            }
-          };
-
-          if (toggleButton && bodySection) {
-            toggleButton.textContent = collapsedLabel;
-            toggleButton.dataset.state = 'closed';
-            toggleButton.addEventListener('click', () => {
-              if (bodySection.hasAttribute('hidden')) {
-                openEditor();
-              } else {
-                closeEditor();
-              }
-            });
-          }
-
-          if (!saveButton) {
+    function bindResetButton() {
+      const resetButton = document.getElementById('reset-button');
+      if (!resetButton) return;
+      resetButton.addEventListener('click', () => {
+        const form = resetButton.closest('form');
+        if (!form) return;
+        Array.from(form.elements).forEach(el => {
+          if (el.name === 'page') {
+            el.value = '1';
             return;
           }
-
-          saveButton.addEventListener('click', async () => {
-            ensureInlineAxes(editor);
-            const illustId = Number(editor.dataset.illustId);
-            const axisSelects = Array.from(editor.querySelectorAll('.inline-axis-select'));
-            const axesPayload = axisSelects.map(select => ({
-              axis_id: Number(select.dataset.axisId),
-              score: Number(select.value || '0'),
-            }));
-            const defaultSelect = axisSelects.find(select => Number(select.dataset.axisId) === defaultAxisId);
-            const rating = defaultSelect ? Number(defaultSelect.value || '0') : 0;
-            const customTags = tagsInput
-              ? tagsInput.value
-                  .split(',')
-                  .map(tag => tag.trim())
-                  .filter(Boolean)
-              : [];
-            if (statusLabel) {
-              statusLabel.textContent = '菫晏ｭ倅ｸｭ窶ｦ';
-            }
-            try {
-              const response = await fetch(`/api/illust/${illustId}/meta`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ custom_tags: customTags, rating, axes: axesPayload }),
-              });
-              if (!response.ok) {
-                throw new Error('failed to update metadata');
-              }
-              const result = await response.json();
-              updateCardAfterSave(illustId, result);
-              if (statusLabel) {
-                statusLabel.textContent = '菫晏ｭ倥＠縺ｾ縺励◆';
-                setTimeout(() => {
-                  statusLabel.textContent = '';
-                }, 2500);
-              }
-              editor.dataset.customTags = customTags.join(', ');
-            } catch (error) {
-              console.error(error);
-              if (statusLabel) {
-                statusLabel.textContent = '菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆';
-              }
-            }
-          });
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = el.defaultChecked;
+          } else if ('value' in el) {
+            el.value = '';
+          }
         });
-      }
-      renderAllBadges();
-      bindQuickRatingBadges();
-      initializeTagPanels();
-      bindInlineEditors();
-    })();
-      (function initRecentBookmarkControls() {
-        const recentStatus = document.getElementById('recent-status');
-        const fetchRecentButton = document.getElementById('fetch-recent-button');
-        const fetchRecentLimitInput = document.getElementById('fetch-recent-limit');
-        if (!recentStatus || !fetchRecentButton) {
-          return;
+      });
+    }
+
+    function renderBadge(el) {
+      const mode = (el.dataset.displayMode || 'stars').toLowerCase();
+      const score = Number(el.dataset.score || 0);
+      const max = Math.max(1, Number(el.dataset.max || 5));
+      const ratio = Math.min(1, Math.max(0, score / max));
+      const output = el.querySelector('.rating-output');
+      const gauge = el.querySelector('.rating-gauge');
+      if (output) {
+        if (mode === 'stars') {
+          output.textContent = '★'.repeat(score) + '☆'.repeat(Math.max(0, max - score));
+        } else if (mode === 'circles') {
+          output.textContent = '●'.repeat(score) + '○'.repeat(Math.max(0, max - score));
+        } else if (mode === 'squares') {
+          output.textContent = '■'.repeat(score) + '□'.repeat(Math.max(0, max - score));
+        } else if (mode === 'numeric') {
+          output.textContent = `${score} / ${max}`;
+        } else {
+          output.textContent = `${Math.round(ratio * 100)}%`;
         }
+      }
+      if (gauge) {
+        gauge.style.display = mode === 'bar' ? 'block' : 'none';
+        const fill = gauge.querySelector('.rating-gauge-fill');
+        if (fill) fill.style.width = `${ratio * 100}%`;
+      }
+    }
 
-        const clampLimit = (value) => {
-          const numeric = Number(value);
-          if (!Number.isFinite(numeric)) {
-            return 100;
-          }
-          return Math.max(1, Math.min(500, Math.floor(numeric)));
-        };
+    function renderAllBadges() {
+      document.querySelectorAll('[data-rating-badge]').forEach(renderBadge);
+    }
 
-        const getSelectedLimit = () => clampLimit(fetchRecentLimitInput ? fetchRecentLimitInput.value : 100);
-        const formatButtonLabel = (limit) => `Fetch latest ${limit}`;
-
-        let idleLabel = formatButtonLabel(getSelectedLimit());
-
-        const setIdleLabel = (limit) => {
-          idleLabel = formatButtonLabel(limit);
-          if (!fetchRecentButton.disabled) {
-            fetchRecentButton.textContent = idleLabel;
-          }
-        };
-
-        const renderStatus = (lines, latestInfo) => {
-          recentStatus.replaceChildren();
-          const mergedLines = Array.isArray(lines) ? lines.filter(Boolean) : [];
-          mergedLines.forEach((line, index) => {
-            if (index > 0) {
-              recentStatus.appendChild(document.createElement('br'));
-            }
-            const span = document.createElement('span');
-            span.textContent = line;
-            recentStatus.appendChild(span);
-          });
-
-          if (latestInfo && latestInfo.title) {
-            if (recentStatus.childNodes.length > 0) {
-              recentStatus.appendChild(document.createElement('br'));
-            }
-            const prefix = document.createElement('span');
-            prefix.textContent = 'Latest bookmark: ';
-            recentStatus.appendChild(prefix);
-
-            if (latestInfo.url) {
-              const link = document.createElement('a');
-              link.href = latestInfo.url;
-              link.target = '_blank';
-              link.rel = 'noopener noreferrer';
-              link.textContent = latestInfo.title;
-              recentStatus.appendChild(link);
+    function bindInlineEditors() {
+      document.querySelectorAll('[data-inline-editor]').forEach(editor => {
+        const toggle = editor.querySelector('.inline-toggle');
+        const body = editor.querySelector('.inline-body');
+        const saveButton = editor.querySelector('.inline-save');
+        const statusLabel = editor.querySelector('.inline-status');
+        if (toggle && body) {
+          toggle.addEventListener('click', () => {
+            const hidden = body.hasAttribute('hidden');
+            if (hidden) {
+              body.removeAttribute('hidden');
+              toggle.textContent = toggle.dataset.expandedLabel || '閉じる';
             } else {
-              const titleSpan = document.createElement('span');
-              titleSpan.textContent = latestInfo.title;
-              recentStatus.appendChild(titleSpan);
+              body.setAttribute('hidden', '');
+              toggle.textContent = toggle.dataset.collapsedLabel || 'クイック編集';
             }
-
-            const metaPieces = [];
-            if (latestInfo.artist) {
-              metaPieces.push(latestInfo.artist);
-            }
-            if (latestInfo.bookmarked_at) {
-              metaPieces.push(String(latestInfo.bookmarked_at).replace('T', ' '));
-            }
-            if (metaPieces.length) {
-              const metaSpan = document.createElement('span');
-              metaSpan.textContent = ` (${metaPieces.join(' 窶｢ ')})`;
-              recentStatus.appendChild(metaSpan);
-            }
-          }
-
-          if (!recentStatus.childNodes.length) {
-            recentStatus.textContent = 'Recent bookmark fetch is idle';
-          }
-        };
-
-        const setRunningState = (limit, processed, downloaded, skipped) => {
-          fetchRecentButton.disabled = true;
-          if (fetchRecentLimitInput) {
-            fetchRecentLimitInput.disabled = true;
-          }
-          fetchRecentButton.textContent = `Fetching latest ${limit}...`;
-          renderStatus([
-            `Fetching latest ${limit}...`,
-            `progress: processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`,
-          ]);
-        };
-
-        const applyIdleState = (limit, lines, latestInfo) => {
-          if (fetchRecentLimitInput) {
-            fetchRecentLimitInput.disabled = false;
-            fetchRecentLimitInput.value = String(limit);
-          }
-          fetchRecentButton.disabled = false;
-          setIdleLabel(limit);
-          renderStatus(lines, latestInfo);
-        };
-
-        async function refreshRecentStatus() {
-          try {
-            const response = await fetch('/api/recent/status');
-            if (!response.ok) {
-              throw new Error('failed to fetch recent status');
-            }
-            const data = await response.json();
-            const running = Boolean(data.running);
-            const processed = Number(data.processed || 0);
-            const downloaded = Number(data.downloaded || 0);
-            const skipped = Number(data.skipped || 0);
-            const finishedAt = data.last_finished_at ? String(data.last_finished_at).replace('T', ' ') : null;
-            const limitFromState = clampLimit(data.limit || getSelectedLimit());
-            if (fetchRecentLimitInput && !fetchRecentLimitInput.disabled) {
-              fetchRecentLimitInput.value = String(limitFromState);
-            }
-
-            if (running) {
-              setRunningState(limitFromState, processed, downloaded, skipped);
-              return;
-            }
-
-            const summaryLines = [];
-            if (finishedAt) {
-              summaryLines.push(`Last fetch: ${finishedAt}`);
-            }
-            summaryLines.push(`Processed ${processed} / downloaded ${downloaded} / skipped ${skipped}`);
-            if (data.message) {
-              summaryLines.push(data.message);
-            }
-
-            const latestInfo = {
-              title: data.latest_title,
-              url: data.latest_url,
-              artist: data.latest_artist,
-              bookmarked_at: data.latest_bookmarked_at,
-            };
-
-            applyIdleState(limitFromState, summaryLines, latestInfo);
-          } catch (error) {
-            console.error(error);
-            if (fetchRecentLimitInput) {
-              fetchRecentLimitInput.disabled = false;
-            }
-            fetchRecentButton.disabled = false;
-            fetchRecentButton.textContent = idleLabel;
-            recentStatus.textContent = 'Failed to refresh recent bookmark status';
-          }
+          });
         }
-
-        fetchRecentButton.addEventListener('click', async () => {
-          if (fetchRecentButton.disabled) {
-            return;
-          }
-          const limitToUse = getSelectedLimit();
-          setRunningState(limitToUse, 0, 0, 0);
+        saveButton?.addEventListener('click', async () => {
+          const illustId = Number(editor.dataset.illustId);
+          const axisSelects = Array.from(editor.querySelectorAll('.inline-axis-select'));
+          const axesPayload = axisSelects.map(select => ({
+            axis_id: Number(select.dataset.axisId),
+            score: Number(select.value || '0'),
+          }));
+          const defaultAxisId = Number(document.body.dataset.defaultAxis || '0');
+          const defaultEntry = axesPayload.find(a => a.axis_id === defaultAxisId);
+          const tagsInput = editor.querySelector('.inline-tags-input');
+          const customTags = tagsInput ? tagsInput.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+          if (statusLabel) statusLabel.textContent = '保存中…';
           try {
-            const response = await fetch('/api/recent/fetch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ limit: limitToUse }),
+            const resp = await postJSON(`/api/illust/${illustId}/meta`, {
+              rating: defaultEntry ? defaultEntry.score : 0,
+              custom_tags: customTags,
+              axes: axesPayload,
             });
-            if (!response.ok) {
-              let message = 'Failed to fetch recent bookmarks';
-              try {
-                const data = await response.json();
-                if (data && data.message) {
-                  message = data.message;
-                }
-              } catch (_parseError) {
-                // ignore JSON parse errors
-              }
-              throw new Error(message);
+            if (statusLabel) statusLabel.textContent = '保存しました';
+            setTimeout(() => { if (statusLabel) statusLabel.textContent = ''; }, 2000);
+            if (resp && resp.axes) {
+              editor.dataset.axisScores = JSON.stringify(resp.axes);
             }
           } catch (error) {
             console.error(error);
-            applyIdleState(getSelectedLimit(), ['Failed to fetch recent bookmarks', error.message], null);
-            return;
+            if (statusLabel) statusLabel.textContent = '保存に失敗しました';
           }
-          await refreshRecentStatus();
         });
+      });
+    }
 
-        if (fetchRecentLimitInput) {
-          const handleLimitChange = () => {
-            const current = getSelectedLimit();
-            fetchRecentLimitInput.value = String(current);
-            setIdleLabel(current);
-          };
-          fetchRecentLimitInput.addEventListener('change', handleLimitChange);
-          fetchRecentLimitInput.addEventListener('input', handleLimitChange);
+    function bindLogModal() {
+      const modal = document.getElementById('log-modal');
+      const backdrop = document.getElementById('log-backdrop');
+      const openBtn = document.getElementById('toggle-logs');
+      const closeBtn = document.getElementById('close-log-modal');
+      const refreshBtn = document.getElementById('refresh-logs');
+      const list = document.getElementById('log-entries');
+
+      const open = () => {
+        modal.classList.add('active');
+        backdrop.classList.add('active');
+        loadLogs();
+      };
+      const close = () => {
+        modal.classList.remove('active');
+        backdrop.classList.remove('active');
+      };
+
+      async function loadLogs() {
+        try {
+          const resp = await fetch('/api/logs?limit=200');
+          if (!resp.ok) throw new Error('log fetch failed');
+          const data = await resp.json();
+          const logs = Array.isArray(data.logs) ? data.logs : [];
+          list.innerHTML = logs.map(entry => `<li>${entry}</li>`).join('');
+          if (!logs.length) list.innerHTML = '<li>ログがありません</li>';
+        } catch (error) {
+          console.error(error);
+          list.innerHTML = '<li>ログの取得に失敗しました</li>';
         }
+      }
 
-        setIdleLabel(getSelectedLimit());
-        refreshRecentStatus();
-        setInterval(refreshRecentStatus, 30000);
-      })();
-    </script>
+      openBtn?.addEventListener('click', open);
+      closeBtn?.addEventListener('click', close);
+      backdrop?.addEventListener('click', close);
+      refreshBtn?.addEventListener('click', loadLogs);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      bindSyncControls();
+      bindMaintenanceControls();
+      bindRecentControls();
+      bindSidebarToggle();
+      bindResetButton();
+      renderAllBadges();
+      bindInlineEditors();
+      bindLogModal();
+    });
+  </script>
 </body>
 </html>

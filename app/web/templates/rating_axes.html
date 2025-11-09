@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>隧穂ｾ｡霆ｸ縺ｮ邂｡逅・- Pixloader Viewer</title>
+  <title>評価軸の管理 - Pixloader Viewer</title>
   <style>
     :root {
       color-scheme: dark;
@@ -21,34 +21,25 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       flex-direction: column;
-      gap: 0.8rem;
+      gap: 0.6rem;
     }
-    header h1 {
-      margin: 0;
-      font-size: clamp(1.6rem, 4vw, 2.2rem);
-    }
-    header a {
-      color: rgba(150, 200, 255, 0.9);
-      text-decoration: none;
-      font-size: 0.9rem;
-    }
-    header a:hover {
-      text-decoration: underline;
-    }
+    header h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+    header a { color: rgba(150, 200, 255, 0.9); text-decoration: none; font-size: 0.9rem; }
+    header a:hover { text-decoration: underline; }
     main {
-      max-width: 960px;
+      max-width: 980px;
       margin: 0 auto;
-      padding: clamp(1.2rem, 4vw, 2.8rem);
+      padding: clamp(1.2rem, 4vw, 3rem);
       display: flex;
       flex-direction: column;
-      gap: 1.8rem;
+      gap: 2rem;
     }
     form.axis-create,
     form.axis-update {
       background: rgba(16, 28, 48, 0.92);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 1.1rem 1.3rem;
+      border-radius: 16px;
+      padding: 1.2rem 1.4rem;
       display: grid;
       gap: 0.9rem;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -58,14 +49,14 @@
       display: flex;
       flex-direction: column;
       gap: 0.35rem;
-      font-size: 0.88rem;
-      color: rgba(235, 240, 255, 0.75);
+      font-size: 0.9rem;
+      color: rgba(235, 240, 255, 0.78);
     }
     input,
     select {
       padding: 0.55rem 0.7rem;
       border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       background: rgba(10, 20, 36, 0.9);
       color: inherit;
       font: inherit;
@@ -73,22 +64,26 @@
     button {
       border: none;
       border-radius: 999px;
-      padding: 0.55rem 1.1rem;
+      padding: 0.55rem 1.2rem;
       font-weight: 600;
       cursor: pointer;
       color: inherit;
-      background: linear-gradient(135deg, #436dff, #784dff);
+      background: linear-gradient(135deg, #4e6dff, #8c4dff);
     }
     button.secondary {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.18);
     }
+    button.danger {
+      background: rgba(255, 110, 140, 0.2);
+      border: 1px solid rgba(255, 110, 140, 0.5);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      background: rgba(16, 28, 48, 0.9);
+      background: rgba(16, 28, 48, 0.92);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
+      border-radius: 16px;
       overflow: hidden;
     }
     th, td {
@@ -98,49 +93,51 @@
       font-size: 0.9rem;
     }
     th {
-      background: rgba(18, 32, 56, 0.82);
+      background: rgba(20, 32, 56, 0.85);
       font-weight: 600;
-      color: rgba(235, 240, 255, 0.8);
+      color: rgba(235, 240, 255, 0.85);
     }
     tbody tr:hover {
       background: rgba(52, 84, 140, 0.16);
     }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.28rem 0.65rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.14);
-      font-size: 0.78rem;
-    }
     .message {
-      padding: 0.7rem 1rem;
+      padding: 0.8rem 1.1rem;
       border-radius: 12px;
       font-size: 0.9rem;
     }
     .message.success {
-      background: rgba(130, 210, 170, 0.18);
-      border: 1px solid rgba(130, 210, 170, 0.45);
-      color: rgba(190, 240, 210, 0.96);
+      background: rgba(120, 210, 170, 0.2);
+      border: 1px solid rgba(120, 210, 170, 0.4);
+      color: rgba(200, 245, 220, 0.95);
     }
     .message.error {
-      background: rgba(255, 140, 140, 0.2);
-      border: 1px solid rgba(255, 140, 140, 0.38);
-      color: rgba(255, 210, 210, 0.96);
+      background: rgba(255, 140, 140, 0.18);
+      border: 1px solid rgba(255, 140, 140, 0.4);
+      color: rgba(255, 215, 215, 0.95);
     }
-    .actions {
+    .inline-actions {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.4rem;
       flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.15);
     }
   </style>
 </head>
 <body>
   <header>
-    <a href="{{ url_for('index') }}">&larr; 荳隕ｧ縺ｫ謌ｻ繧・/a>
-    <h1>隧穂ｾ｡霆ｸ縺ｮ邂｡逅・/h1>
-    <p style="margin:0;color:rgba(235,240,255,0.7);font-size:0.95rem;">
-      繧ｫ繧ｹ繧ｿ繝隧穂ｾ｡霆ｸ繧定ｿｽ蜉繝ｻ譖ｴ譁ｰ縺励※縲√ぐ繝｣繝ｩ繝ｪ繝ｼ繧・ｩｳ邏ｰ逕ｻ髱｢縺ｧ縺ｮ謗｡轤ｹ譁ｹ豕輔ｒ譟碑ｻ溘↓蛻・ｊ譖ｿ縺医ｉ繧後∪縺吶・    </p>
+    <a href="{{ url_for('index') }}">&larr; 一覧へ戻る</a>
+    <h1>評価軸の管理</h1>
+    <p style="margin:0;color:rgba(235,240,255,0.75);font-size:0.95rem;">
+      ビューアで利用する評価軸を追加・編集・削除できます。変更は保存後すぐに反映されます。
+    </p>
   </header>
   <main>
     {% if message %}
@@ -153,39 +150,37 @@
     <form method="post" class="axis-create">
       <input type="hidden" name="action" value="create">
       <label>
-        隧穂ｾ｡霆ｸ蜷・        <input type="text" name="name" placeholder="萓・ 繧ｭ繝｣繝ｩ繧ｯ繧ｿ繝ｼ縲∫ｷ丞粋" required>
+        評価軸名
+        <input type="text" name="name" placeholder="例: 総合, 発想, 配色" required>
       </label>
       <label>
-        譛螟ｧ繧ｹ繧ｳ繧｢
+        最大スコア
         <input type="number" name="max_score" min="1" value="5" required>
       </label>
       <label>
-        陦ｨ遉ｺ譁ｹ豕・        <select name="display_mode">
+        表示形式
+        <select name="display_mode">
+          {% set labels = {'stars': '星 (★)', 'circles': '丸 (●)', 'squares': '四角 (■)', 'numeric': '数値', 'bar': 'バー'} %}
           {% for mode in display_modes %}
-          <option value="{{ mode }}">{{ {
-            'stars': '譏・(笘・',
-            'circles': '荳ｸ (笳・',
-            'squares': '蝗幄ｧ・(笆)',
-            'numeric': '謨ｰ蛟､陦ｨ遉ｺ',
-            'bar': '繧ｲ繝ｼ繧ｸ'
-          }[mode] }}</option>
+          <option value="{{ mode }}">{{ labels.get(mode, mode) }}</option>
           {% endfor %}
         </select>
       </label>
-      <button type="submit">霑ｽ蜉</button>
+      <button type="submit">軸を追加</button>
     </form>
 
     <table>
       <thead>
         <tr>
-          <th style="width:30%">蜷咲ｧｰ</th>
-          <th style="width:18%">譛螟ｧ繧ｹ繧ｳ繧｢</th>
-          <th style="width:20%">陦ｨ遉ｺ譁ｹ豕・/th>
-          <th style="width:14%">譌｢螳・/th>
-          <th style="width:18%">謫堺ｽ・/th>
+          <th style="width:30%">名称</th>
+          <th style="width:14%">最大スコア</th>
+          <th style="width:18%">表示形式</th>
+          <th style="width:12%">既定軸</th>
+          <th style="width:26%">操作</th>
         </tr>
       </thead>
-            <tbody>
+      <tbody>
+        {% set labels = {'stars': '星 (★)', 'circles': '丸 (●)', 'squares': '四角 (■)', 'numeric': '数値', 'bar': 'バー'} %}
         {% for axis in axes %}
         {% set form_id = 'axis-form-' ~ axis.axis_id %}
         <form id="{{ form_id }}" method="post" class="axis-update">
@@ -200,24 +195,29 @@
           <td>
             <select form="{{ form_id }}" name="display_mode">
               {% for mode in display_modes %}
-              <option value="{{ mode }}" {{ 'selected' if axis.display_mode == mode else '' }}>{{ {
-                'stars': '譏・(笘・',
-                'circles': '荳ｸ (笳・',
-                'squares': '蝗幄ｧ・(笆)',
-                'numeric': '謨ｰ蛟､陦ｨ遉ｺ',
-                'bar': '繧ｲ繝ｼ繧ｸ'
-              }[mode] }}</option>
+              <option value="{{ mode }}" {{ 'selected' if axis.display_mode == mode else '' }}>
+                {{ labels.get(mode, mode) }}
+              </option>
               {% endfor %}
             </select>
           </td>
-          <td>{% if axis.is_default %}<span class="badge">譌｢螳・/span>{% else %}--{% endif %}</td>
           <td>
-            <div class="actions">
-              <button type="submit" form="{{ form_id }}" class="secondary">譖ｴ譁ｰ</button>
-              {% if not axis.is_default %}
-              <a class="danger-link" href="{{ url_for('manage_rating_axes', delete=axis.axis_id) }}" onclick="return confirm('譛ｬ蠖薙↓蜑企勁縺励∪縺吶°・・);">蜑企勁</a>
-              {% else %}
-              <span style="color:rgba(235,240,255,0.6);">菫晏ｭ俶ｸ医∩</span>
+            {% if axis.axis_id == default_axis_id %}
+            <span class="badge">既定</span>
+            {% else %}
+            <span class="badge" style="opacity:0.45;">-</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="inline-actions">
+              <button type="submit" form="{{ form_id }}" class="secondary">更新</button>
+              {% if axis.axis_id != default_axis_id %}
+              <a
+                class="danger"
+                href="{{ url_for('manage_rating_axes', delete=axis.axis_id) }}"
+                style="display:inline-flex;align-items:center;padding:0.55rem 1rem;border-radius:999px;text-decoration:none;color:inherit;"
+                onclick="return confirm('「{{ axis.name }}」を削除しますか？');"
+              >削除</a>
               {% endif %}
             </div>
           </td>

@@ -132,21 +132,21 @@ def create_viewer_app(
 
 
     display_mode_options = [
-        {"value": "both", "label": "両方表示"},
+        {"value": "both", "label": "両方"},
         {"value": "image", "label": "画像のみ"},
-        {"value": "text", "label": "情報のみ"},
+        {"value": "text", "label": "テキストのみ"},
     ]
     size_mode_options = [
-        {"value": "xxs", "label": "特小"},
+        {"value": "xxs", "label": "極小"},
         {"value": "xs", "label": "小"},
         {"value": "md", "label": "中"},
         {"value": "lg", "label": "大"},
         {"value": "xl", "label": "特大"},
     ]
     rating_compare_options = [
-        {"value": "ge", "label": "以上 (≧)"},
+        {"value": "ge", "label": "以上 (>=)"},
         {"value": "eq", "label": "等しい (=)"},
-        {"value": "le", "label": "以下 (≦)"},
+        {"value": "le", "label": "以下 (<=)"},
     ]
     rating_display_modes = {"stars", "circles", "squares", "numeric", "bar"}
 
@@ -537,6 +537,7 @@ def create_viewer_app(
             'rating_compare_options': rating_compare_options,
             'include_unknown': '1' if include_unknown_flag else '0',
             'rating_axes': rating_axes,
+            'secondary_axes': [axis for axis in rating_axes if axis.axis_id != default_axis.axis_id],
             'rating_axes_json': rating_axes_json,
             'rating_axis': rating_axis_selected,
             'rating_value': rating_value_selected if rating_value_selected is not None else 0,
@@ -1235,6 +1236,7 @@ def _is_within(root: Path, target: Path) -> bool:
         return True
     except ValueError:
         return False
+
 
 
 

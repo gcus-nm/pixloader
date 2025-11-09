@@ -1,280 +1,197 @@
-﻿{% if illustrations %}
-  {% set default_display_mode = default_axis.display_mode %}
-  <div class="view-panel" data-panel="text">
-    <div class="list-wrapper">
-      <table class="list-table">
-        <thead>
-          <tr>
-            <th style="width:28%">菴懷刀</th>
-            <th style="width:18%">謚慕ｨｿ譌･ / 繝悶け繝樊律</th>
-            <th style="width:16%">菴懆・/th>
-            <th style="width:10%">繝輔Λ繧ｰ</th>
-            <th style="width:20%">繧ｯ繧､繝・け邱ｨ髮・/th>
-            <th style="width:6%">繝悶け繝・/th>
-            <th style="width:6%">髢ｲ隕ｧ</th>
-            <th style="width:8%">Pixiv</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in illustrations %}
-          {% set default_score = item.ratings.get(default_axis_id, item.rating) %}
-          {% set secondary_axes = rating_axes | selectattr('axis_id', 'ne', default_axis_id) | list %}
-          {% set total_tags = item.tags|length + item.custom_tags|length %}
-          <tr class="list-row" data-illust-id="{{ item.illust_id }}">
-            <td class="col-title">
-              <a href="{{ url_for('view_illust', illust_id=item.illust_id, **request.args.to_dict()) }}">{{ item.title or '繧ｿ繧､繝医Ν譛ｪ險ｭ螳・ }}</a>
-              <div class="row-meta">DL: {{ item.last_downloaded_at or '-' }}</div>
-              <div class="row-meta">ID: {{ item.illust_id }}</div>
-            </td>
-            <td>
-              <div class="row-meta">謚慕ｨｿ: {{ item.posted_at or '-' }}</div>
-              <div class="row-meta">繝悶け繝・ {{ item.bookmarked_at or '-' }}</div>
-            </td>
-            <td>
-              {% if item.artist %}
-              <button type="button" class="meta-button" data-filter-artist="{{ item.artist }}">{{ item.artist }}</button>
-              {% else %}
-              <span>菴懆・ｸ肴・</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if item.is_r18 %}<span class="pill pill-r18">R-18</span>{% endif %}
-              {% if item.is_ai %}<span class="pill pill-ai">AI</span>{% endif %}
-            </td>
-            <td>
-              <div class="rating-stack">
-                <span
-                  class="badge rating-badge"
-                  data-rating-badge
-                  data-illust-id="{{ item.illust_id }}"
-                  data-axis-id="{{ default_axis_id }}"
-                  data-display-mode="{{ default_display_mode }}"
-                  data-max="{{ default_axis.max_score }}"
-                  data-score="{{ default_score }}"
-                >
-                  <span class="rating-output"></span>
-                  <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
-                </span>
-              </div>
-              {% if secondary_axes %}
-              <div class="axis-chips">
-                {% for axis in secondary_axes %}
-                {% set axis_score = item.ratings.get(axis.axis_id, 0) %}
-                <div class="axis-chip" data-illust-id="{{ item.illust_id }}" data-axis-id="{{ axis.axis_id }}">
-                  <span class="axis-chip-label">{{ axis.name }}</span>
-                  <span
-                    class="badge rating-badge axis-badge"
-                    data-rating-badge
-                    data-illust-id="{{ item.illust_id }}"
-                    data-axis-id="{{ axis.axis_id }}"
-                    data-display-mode="{{ axis.display_mode }}"
-                    data-max="{{ axis.max_score }}"
-                    data-score="{{ axis_score }}"
-                  >
-                    <span class="rating-output"></span>
-                    <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
-                  </span>
-                </div>
-                {% endfor %}
-              </div>
-              {% endif %}
-              <div
-                class="inline-editor list"
-                data-inline-editor
-                data-illust-id="{{ item.illust_id }}"
-                data-axis-scores="{{ item.ratings|tojson|e }}"
-                data-default-rating="{{ item.ratings.get(default_axis_id, item.rating)|default(0, true) }}"
-                data-custom-tags="{{ item.custom_tags|join(', ')|e }}"
-              >
-                <div class="inline-header">
-                  <button
-                    type="button"
-                    class="inline-toggle secondary"
-                    data-collapsed-label="繧ｯ繧､繝・け邱ｨ髮・
-                    data-expanded-label="髢峨§繧・
-                  >
-                    繧ｯ繧､繝・け邱ｨ髮・                  </button>
-                  <a
-                    class="pixiv-link"
-                    href="https://www.pixiv.net/artworks/{{ item.illust_id }}"
-                    target="_blank"
-                    rel="noopener"
-                  >Pixiv</a>
-                </div>
-                <div class="inline-body" hidden>
-                  <div class="inline-axes"></div>
-                  <label class="inline-tags-label">
-                    <span>迢ｬ閾ｪ繧ｿ繧ｰ</span>
-                    <input type="text" class="inline-tags-input" value="{{ item.custom_tags|join(', ') }}" placeholder="萓・ 縺頑ｰ励↓蜈･繧・ 蜀埼夢隕ｧ逕ｨ">
-                  </label>
-                  <div class="inline-actions">
-                    <button type="button" class="inline-save">菫晏ｭ・/button>
-                    <span class="inline-status"></span>
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td>{{ item.bookmark_count }}</td>
-            <td>{{ item.view_count }}</td>
-            <td><a href="https://www.pixiv.net/artworks/{{ item.illust_id }}" target="_blank" rel="noopener">髢九￥</a></td>
-          </tr>
-          <tr class="list-tags-row" data-illust-id="{{ item.illust_id }}">
-            <td colspan="8">
-              <div class="tag-panel" data-tag-panel data-threshold="12">
-                <div
-                  class="tag-pills"
-                  data-tags
-                  data-scrollable="list"
-                  data-expanded="false"
-                  data-illust-id="{{ item.illust_id }}"
-                  data-pixiv-tags="{{ item.tags|join(', ') }}"
-                  data-custom-tags="{{ item.custom_tags|join(', ') }}"
-                >
-                  {% for tag in item.tags %}
-                  <button type="button" class="tag-button" data-filter-tag="{{ tag }}">{{ tag }}</button>
-                  {% endfor %}
-                  {% for tag in item.custom_tags %}
-                  <button type="button" class="tag-button custom" data-filter-tag="{{ tag }}">#{{ tag }}</button>
-                  {% endfor %}
-                </div>
-                <button type="button" class="tag-expand secondary" data-expand-tags {% if total_tags <= 12 %}hidden{% endif %}>繧ｿ繧ｰ繧偵☆縺ｹ縺ｦ陦ｨ遉ｺ</button>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+{% macro rating_badge(item, axis_id, axis, default=False) -%}
+  {% set score = item.ratings.get(axis_id, item.rating if default else 0) %}
+  <span
+    class="badge rating-badge{% if not default %} axis-badge{% endif %}"
+    data-rating-badge
+    data-illust-id="{{ item.illust_id }}"
+    data-axis-id="{{ axis_id }}"
+    data-display-mode="{{ axis.display_mode }}"
+    data-max="{{ axis.max_score }}"
+    data-score="{{ score }}"
+  >
+    <span class="rating-output"></span>
+    <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
+  </span>
+{%- endmacro %}
 
-  <div class="view-panel" data-panel="grid">
-    <div class="gallery-grid">
-      {% for item in illustrations %}
-      {% set default_score = item.ratings.get(default_axis_id, item.rating) %}
-      {% set secondary_axes = rating_axes | selectattr('axis_id', 'ne', default_axis_id) | list %}
-      {% set total_tags = item.tags|length + item.custom_tags|length %}
-      <article class="card" data-illust-id="{{ item.illust_id }}">
-        <figure>
-          <div class="preview-wrapper">
-            <a
-              class="preview-link"
-              href="{{ url_for('view_illust', illust_id=item.illust_id, **request.args.to_dict()) }}"
-            >
-              <img src="{{ url_for('serve_file', path=item.cover_path) }}" alt="{{ item.title or '繧､繝ｩ繧ｹ繝・ }}">
-            </a>
-            <div
-              class="info-overlay"
-              data-info
-              data-illust-id="{{ item.illust_id }}"
-              data-pixiv-tags="{{ item.tags|join(', ') }}"
-              data-custom-tags="{{ item.custom_tags|join(', ') }}"
-            >
-              <div class="overlay-top">
-                <span class="overlay-title">{{ item.title or '繧ｿ繧､繝医Ν譛ｪ險ｭ螳・ }}</span>
-                <div class="overlay-flags">
-                  {% if item.is_r18 %}<span class="overlay-pill r18">R-18</span>{% endif %}
-                  {% if item.is_ai %}<span class="overlay-pill ai">AI</span>{% endif %}
+{% set show_list = display_mode in ['both', 'text'] %}
+{% set show_grid = display_mode in ['both', 'image'] %}
+{% set grid_class = 'gallery-grid size-' ~ size_mode %}
+
+{% if illustrations %}
+  {% if show_list %}
+  <section class="view-panel" data-view="list">
+    <table class="illust-table">
+      <thead>
+        <tr>
+          <th style="width:26%">作品</th>
+          <th style="width:18%">投稿日 / ブクマ日</th>
+          <th style="width:14%">作者</th>
+          <th style="width:8%">フラグ</th>
+          <th style="width:18%">クイック編集</th>
+          <th style="width:6%">ブクマ</th>
+          <th style="width:6%">閲覧</th>
+          <th style="width:4%">Pixiv</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in illustrations %}
+        <tr data-illust-id="{{ item.illust_id }}">
+          <td class="illust-title">
+            <a href="{{ url_for('view_illust', illust_id=item.illust_id) }}">{{ item.title or 'タイトル未設定' }}</a>
+            <div class="row-sub">最終 DL: {{ item.last_downloaded_at or '-' }}</div>
+            <div class="row-sub">ID: {{ item.illust_id }}</div>
+          </td>
+          <td>
+            <div class="row-sub">投稿日: {{ item.posted_at or '-' }}</div>
+            <div class="row-sub">ブクマ日: {{ item.bookmarked_at or '-' }}</div>
+          </td>
+          <td>
+            {% if item.artist %}
+            <button type="button" class="meta-button" data-filter-artist="{{ item.artist }}">{{ item.artist }}</button>
+            {% else %}
+            <span class="row-sub">作者未設定</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.is_r18 %}<span class="pill pill-r18">R-18</span>{% endif %}
+            {% if item.is_ai %}<span class="pill pill-ai">AI</span>{% endif %}
+          </td>
+          <td>
+            <div class="rating-stack">
+              {{ rating_badge(item, default_axis_id, default_axis, True) }}
+            </div>
+            {% if secondary_axes %}
+            <div class="axis-chips">
+              {% for axis in secondary_axes %}
+              <div class="axis-chip" data-axis-id="{{ axis.axis_id }}">
+                <span class="axis-chip-label">{{ axis.name }}</span>
+                {{ rating_badge(item, axis.axis_id, axis) }}
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <div class="inline-editor"
+                 data-inline-editor
+                 data-illust-id="{{ item.illust_id }}"
+                 data-axis-scores="{{ item.ratings|tojson|e }}"
+                 data-default-rating="{{ item.ratings.get(default_axis_id, item.rating)|default(0, true) }}"
+                 data-custom-tags="{{ item.custom_tags|join(', ')|e }}">
+              <button type="button" class="inline-toggle" data-collapsed-label="クイック編集" data-expanded-label="閉じる">クイック編集</button>
+              <div class="inline-body" hidden>
+                <div class="inline-axes">
+                  {% for axis in rating_axes %}
+                  {% set current = item.ratings.get(axis.axis_id, item.rating if axis.axis_id == default_axis_id else 0) %}
+                  <label class="inline-axis">
+                    <span>{{ axis.name }}</span>
+                    <select class="inline-axis-select" data-axis-id="{{ axis.axis_id }}">
+                      {% for value in range(axis.max_score + 1) %}
+                      <option value="{{ value }}" {{ 'selected' if current == value else '' }}>{{ value }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  {% endfor %}
+                </div>
+                <label class="inline-tags">
+                  <span>カスタムタグ</span>
+                  <input type="text" class="inline-tags-input" value="{{ item.custom_tags|join(', ') }}" placeholder="例: 神構図, 旅ログ">
+                </label>
+                <div class="inline-actions">
+                  <button type="button" class="inline-save">保存</button>
+                  <span class="inline-status"></span>
                 </div>
               </div>
-              <div class="overlay-meta">
-                {% if item.artist %}
-                <button type="button" class="overlay-link" data-filter-artist="{{ item.artist }}">{{ item.artist }}</button>
-                {% else %}
-                <span class="overlay-link disabled">菴懆・ｸ肴・</span>
-                {% endif %}
-                <span>繝悶け繝・{{ item.bookmark_count }}</span>
-                <span>髢ｲ隕ｧ {{ item.view_count }}</span>
-              </div>
-              <div
-                class="overlay-tags"
-                data-overlay-tags
-                data-illust-id="{{ item.illust_id }}"
-                data-scrollable="card"
-                data-pixiv-tags="{{ item.tags|join(', ') }}"
-                data-custom-tags="{{ item.custom_tags|join(', ') }}"
-              >
+            </div>
+          </td>
+          <td>{{ item.bookmark_count }}</td>
+          <td>{{ item.view_count }}</td>
+          <td><a href="https://www.pixiv.net/artworks/{{ item.illust_id }}" target="_blank" rel="noopener">表示</a></td>
+        </tr>
+        <tr class="tag-row">
+          <td colspan="8">
+            <div class="tag-panel" data-tag-panel>
+              <div class="tag-list" data-tags data-illust-id="{{ item.illust_id }}">
                 {% for tag in item.tags %}
-                <button type="button" class="overlay-tag" data-filter-tag="{{ tag }}">{{ tag }}</button>
+                <button type="button" class="tag-button" data-filter-tag="{{ tag }}">{{ tag }}</button>
                 {% endfor %}
                 {% for tag in item.custom_tags %}
-                <button type="button" class="overlay-tag custom" data-filter-tag="{{ tag }}">#{{ tag }}</button>
+                <button type="button" class="tag-button custom" data-filter-tag="{{ tag }}">#{{ tag }}</button>
                 {% endfor %}
               </div>
             </div>
-          </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if show_grid %}
+  <section class="view-panel" data-view="grid">
+    <div class="{{ grid_class }}">
+      {% for item in illustrations %}
+      <article class="card" data-illust-id="{{ item.illust_id }}">
+        <figure>
+          <a class="preview-link" href="{{ url_for('view_illust', illust_id=item.illust_id) }}">
+            <img src="{{ url_for('serve_file', path=item.cover_path) }}" alt="{{ item.title or 'サムネイル' }}">
+          </a>
           <figcaption>
-            <span>繝壹・繧ｸ謨ｰ {{ item.count }}</span>
-            <span>ID {{ item.illust_id }}</span>
+            <strong>{{ item.title or 'タイトル未設定' }}</strong>
+            <span>ページ {{ item.count }}</span>
           </figcaption>
         </figure>
         <div class="card-body">
+          <div class="card-meta">
+            {% if item.artist %}
+            <button type="button" class="meta-button" data-filter-artist="{{ item.artist }}">{{ item.artist }}</button>
+            {% endif %}
+            <span>ID {{ item.illust_id }}</span>
+          </div>
+          <div class="flag-row">
+            {% if item.is_r18 %}<span class="pill pill-r18">R-18</span>{% endif %}
+            {% if item.is_ai %}<span class="pill pill-ai">AI</span>{% endif %}
+          </div>
           <div class="rating-stack">
-            <span
-              class="badge rating-badge"
-              data-rating-badge
-              data-illust-id="{{ item.illust_id }}"
-              data-axis-id="{{ default_axis_id }}"
-              data-display-mode="{{ default_display_mode }}"
-              data-max="{{ default_axis.max_score }}"
-              data-score="{{ default_score }}"
-            >
-              <span class="rating-output"></span>
-              <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
-            </span>
+            {{ rating_badge(item, default_axis_id, default_axis, True) }}
           </div>
           {% if secondary_axes %}
           <div class="axis-chips">
             {% for axis in secondary_axes %}
-            {% set axis_score = item.ratings.get(axis.axis_id, 0) %}
-            <div class="axis-chip" data-illust-id="{{ item.illust_id }}" data-axis-id="{{ axis.axis_id }}">
+            <div class="axis-chip">
               <span class="axis-chip-label">{{ axis.name }}</span>
-              <span
-                class="badge rating-badge axis-badge"
-                data-rating-badge
-                data-illust-id="{{ item.illust_id }}"
-                data-axis-id="{{ axis.axis_id }}"
-                data-display-mode="{{ axis.display_mode }}"
-                data-max="{{ axis.max_score }}"
-                data-score="{{ axis_score }}"
-              >
-                <span class="rating-output"></span>
-                <span class="rating-gauge"><span class="rating-gauge-fill"></span></span>
-              </span>
+              {{ rating_badge(item, axis.axis_id, axis) }}
             </div>
             {% endfor %}
           </div>
           {% endif %}
-          <div
-            class="inline-editor compact"
-            data-inline-editor
-            data-illust-id="{{ item.illust_id }}"
-            data-axis-scores="{{ item.ratings|tojson|e }}"
-            data-default-rating="{{ item.ratings.get(default_axis_id, item.rating)|default(0, true) }}"
-            data-custom-tags="{{ item.custom_tags|join(', ')|e }}"
-          >
-            <div class="inline-header">
-              <button
-                type="button"
-                class="inline-toggle secondary"
-                data-collapsed-label="繧ｯ繧､繝・け邱ｨ髮・
-                data-expanded-label="髢峨§繧・
-              >
-                繧ｯ繧､繝・け邱ｨ髮・              </button>
-              <a
-                class="pixiv-link"
-                href="https://www.pixiv.net/artworks/{{ item.illust_id }}"
-                target="_blank"
-                rel="noopener"
-              >Pixiv</a>
-            </div>
+          <div class="inline-editor compact"
+               data-inline-editor
+               data-illust-id="{{ item.illust_id }}"
+               data-axis-scores="{{ item.ratings|tojson|e }}"
+               data-default-rating="{{ item.ratings.get(default_axis_id, item.rating)|default(0, true) }}"
+               data-custom-tags="{{ item.custom_tags|join(', ')|e }}">
+            <button type="button" class="inline-toggle" data-collapsed-label="クイック編集" data-expanded-label="閉じる">クイック編集</button>
             <div class="inline-body" hidden>
-              <div class="inline-axes"></div>
-              <label class="inline-tags-label">
-                <span>迢ｬ閾ｪ繧ｿ繧ｰ</span>
-                <input type="text" class="inline-tags-input" value="{{ item.custom_tags|join(', ') }}" placeholder="萓・ 縺頑ｰ励↓蜈･繧・ 蜀埼夢隕ｧ逕ｨ">
+              <div class="inline-axes">
+                {% for axis in rating_axes %}
+                {% set current = item.ratings.get(axis.axis_id, item.rating if axis.axis_id == default_axis_id else 0) %}
+                <label class="inline-axis">
+                  <span>{{ axis.name }}</span>
+                  <select class="inline-axis-select" data-axis-id="{{ axis.axis_id }}">
+                    {% for value in range(axis.max_score + 1) %}
+                    <option value="{{ value }}" {{ 'selected' if current == value else '' }}>{{ value }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                {% endfor %}
+              </div>
+              <label class="inline-tags">
+                <span>カスタムタグ</span>
+                <input type="text" class="inline-tags-input" value="{{ item.custom_tags|join(', ') }}" placeholder="例: 描き込み, 旅ログ">
               </label>
               <div class="inline-actions">
-                <button type="button" class="inline-save">菫晏ｭ・/button>
+                <button type="button" class="inline-save">保存</button>
                 <span class="inline-status"></span>
               </div>
             </div>
@@ -283,15 +200,16 @@
       </article>
       {% endfor %}
     </div>
-  </div>
+  </section>
+  {% endif %}
 
   <nav class="pagination">
     {% if pagination.has_prev %}
-    <a href="{{ build_url(page=1) }}">&laquo; 譛蛻・/a>
-    <a href="{{ build_url(page=pagination.page - 1) }}">&lsaquo; 蜑・/a>
+    <a href="{{ build_url(page=1) }}">« 最初</a>
+    <a href="{{ build_url(page=pagination.page - 1) }}">‹ 前へ</a>
     {% else %}
-    <span class="disabled">&laquo; 譛蛻・/span>
-    <span class="disabled">&lsaquo; 蜑・/span>
+    <span class="disabled">« 最初</span>
+    <span class="disabled">‹ 前へ</span>
     {% endif %}
 
     {% for p in pagination.window %}
@@ -303,15 +221,15 @@
     {% endfor %}
 
     {% if pagination.has_next %}
-    <a href="{{ build_url(page=pagination.page + 1) }}">谺｡ &rsaquo;</a>
-    <a href="{{ build_url(page=pagination.pages) }}">譛蠕・&raquo;</a>
+    <a href="{{ build_url(page=pagination.page + 1) }}">次へ ›</a>
+    <a href="{{ build_url(page=pagination.pages) }}">最後 »</a>
     {% else %}
-    <span class="disabled">谺｡ &rsaquo;</span>
-    <span class="disabled">譛蠕・&raquo;</span>
+    <span class="disabled">次へ ›</span>
+    <span class="disabled">最後 »</span>
     {% endif %}
   </nav>
 {% else %}
   <div class="empty-state">
-    <p>縺ｾ縺繧､繝ｩ繧ｹ繝医′隕九▽縺九ｊ縺ｾ縺帙ｓ縲１ixiv繝悶ャ繧ｯ繝槭・繧ｯ縺ｮ蜷梧悄繧貞ｮ溯｡後＠縺ｦ縺上□縺輔＞縲・/p>
+    <p>条件に一致する作品が見つかりませんでした。フィルターを調整して再検索してください。</p>
   </div>
 {% endif %}
