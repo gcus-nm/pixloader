@@ -311,13 +311,11 @@ def fetch_recent_batch(
                 target_dir.mkdir(parents=True, exist_ok=True)
                 target_path = target_dir / task.filename
                 if target_path.exists():
-                    skipped += 1
-                else:
-                    success = service.download_image(task, target_path)
-                    if not success:
-                        skipped += 1
-                        continue
-                    work_downloaded = True
+                    continue
+                success = service.download_image(task, target_path)
+                if not success:
+                    continue
+                work_downloaded = True
 
                 registry.record_download(
                     task.illust_id,
@@ -336,6 +334,8 @@ def fetch_recent_batch(
 
             if work_downloaded:
                 downloaded += 1
+            else:
+                skipped += 1
             if progress_callback:
                 progress_callback(processed, skipped, downloaded, 0)
 
