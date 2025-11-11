@@ -305,6 +305,7 @@ def fetch_recent_batch(
                     progress_callback(processed, skipped, downloaded, 0)
                 continue
 
+            work_downloaded = False
             for task in tasks:
                 target_dir = config.download_dir / task.directory_name
                 target_dir.mkdir(parents=True, exist_ok=True)
@@ -316,7 +317,7 @@ def fetch_recent_batch(
                     if not success:
                         skipped += 1
                         continue
-                    downloaded += 1
+                    work_downloaded = True
 
                 registry.record_download(
                     task.illust_id,
@@ -333,6 +334,8 @@ def fetch_recent_batch(
                     bookmarked_at=task.bookmarked_at,
                 )
 
+            if work_downloaded:
+                downloaded += 1
             if progress_callback:
                 progress_callback(processed, skipped, downloaded, 0)
 
